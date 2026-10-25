@@ -1,0 +1,4 @@
+{
+  "_": "Διαχειριστές του Discord bot (Discord usernames, όχι nicknames). Ο dr_slump είναι πάντα διαχειριστής. Αλλάζει χωρίς νέο deploy (το bot το ξαναδιαβάζει κάθε 1 λεπτό).",
+  "admins": ["dr_slump", "tasmanix"]
+}
