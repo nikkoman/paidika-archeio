@@ -247,7 +247,8 @@
   // σειρά της καρτέλας «Όλα»: επιλογή καναλιού/μεταγλώττισης και από κάτω η λεπτομέρεια εκείνου του καναλιού
   function groupDetail(v) {
     const g = v.group;
-    if (g.length === 1) return detail(g[0].s, true);
+    // μία μόνο κοινή μεταγλώττιση (ίδια πρόοδος παντού): η επιλογή καναλιού δεν προσφέρει κάτι
+    if (g.length === 1 || g.every((o) => o.s.dub === g[0].s.dub && totalOf(o.s) === totalOf(g[0].s))) return detail(g[0].s, true);
     // προεπιλογή: «Όλα» = η ένωση όλων των καναλιών· αλλιώς ένα συγκεκριμένο κανάλι
     const cur = g[pick[v.id]] ? pick[v.id] : -1;
     const xa = stats(v);
