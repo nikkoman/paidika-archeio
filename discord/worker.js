@@ -241,12 +241,27 @@ const opLine = (o) => o.state === "count"
 // ---------- failsafe: τι επιτρέπεται χωρίς δικαιώματα διαχειριστή ----------
 const MAX_REMOVE = 10;
 // Διαχειριστές = Discord usernames (όχι nicknames). Χωρίς περιορισμούς στο failsafe.
+// Η λίστα ζει στο repo (data/admins.json), ώστε να αλλάζει χωρίς νέο deploy· το ADMINS είναι εφεδρικό
+// αν δεν διαβαστεί το αρχείο. Ο ιδιοκτήτης (OWNER) είναι πάντα διαχειριστής.
+const OWNER = "dr_slump";
 const ADMINS = ["dr_slump", "diafanos", "tasmanix"];
+const ADMINS_URL = SITE + "data/admins.json";
+let acache = { at: 0, list: null };
+async function adminList(env) {
+  if (env.ADMIN_USERS) return String(env.ADMIN_USERS).split(",").map((u) => u.trim().toLowerCase());
+  if (!acache.list || Date.now() - acache.at > 60_000) {
+    try {
+      const r = await fetch(ADMINS_URL + "?t=" + Date.now(), { cf: { cacheTtl: 0 } });
+      const j = r.ok ? await r.json() : null;
+      acache = { at: Date.now(), list: Array.isArray(j?.admins) ? j.admins.map((u) => String(u).toLowerCase()) : acache.list || ADMINS };
+    } catch { acache = { at: Date.now(), list: acache.list || ADMINS }; }
+  }
+  return [OWNER, ...acache.list];
+}
 const displayName = (it) => { const u = it.member?.user || it.user || {}; return u.global_name || u.username || "Discord"; };
-function isAdmin(it, env) {
+async function isAdmin(it, env) {
   const username = String((it.member?.user || it.user || {}).username || "").toLowerCase();
-  const admins = env.ADMIN_USERS ? String(env.ADMIN_USERS).split(",").map((u) => u.trim().toLowerCase()) : ADMINS;
-  if (username && admins.includes(username)) return true;
+  if (username && (await adminList(env)).includes(username)) return true;
   return !!(env.ADMIN_ROLE_ID && (it.member?.roles || []).includes(env.ADMIN_ROLE_ID));
 }
 function expand(spec) {
@@ -282,7 +297,7 @@ function compress(nums) {
 // Αφαιρεί από το αίτημα ό,τι δεν επιτρέπεται και κρατά τα υπόλοιπα.
 // Επιστρέφει { ops, warn } (warn = τι παραλείφθηκε και γιατί) ή { deny } αν δεν μένει τίποτα.
 async function guard(it, env, row, ops) {
-  if (isAdmin(it, env)) return { ops, warn: "" };
+  if (await isAdmin(it, env)) return { ops, warn: "" };
   const me = displayName(it);
   const removing = ops.filter((o) => o.state === "missing").flatMap((o) => expand(o.range));
   if (removing.length > MAX_REMOVE)
@@ -318,6 +333,44 @@ async function guard(it, env, row, ops) {
   return kept.length ? { ops: kept, warn } : { deny: warn || "Δεν έμεινε τίποτα να αλλάξει." };
 }
 
+// Βγάζει από το αίτημα ό,τι υπάρχει ήδη στη βάση με την ίδια κατάσταση και λέει από ποιον/πότε.
+// Επιστρέφει { ops, info } (info = κείμενο για τα ήδη ενημερωμένα, κενό αν δεν υπάρχουν).
+async function already(env, row, ops) {
+  const marks = row.d ? (await who(env))[row.d] || [] : [];
+  const cur = new Map(marks.map(([n, s, b, d, note, u]) => [n, { s, b, d, note: note || "", u }]));
+  const same = (o, n) => {
+    const e = cur.get(n);
+    if (o.state === "missing") return !e;
+    if (!e) return false;
+    if (o.state === "found") return e.s === "f";
+    if (o.state === "partial") return e.s === "p" && (!o.note || e.note.includes(o.note));
+    return false;
+  };
+  const dup = [], kept = [];
+  for (const o of ops) {
+    if (!["found", "partial", "missing"].includes(o.state)) { kept.push(o); continue; }
+    const eps = expand(o.range), left = eps.filter((n) => !same(o, n));
+    dup.push(...eps.filter((n) => same(o, n)).map((n) => [n, o.state]));
+    if (left.length) kept.push({ ...o, range: compress(left) });
+  }
+  if (!dup.length) return { ops: kept, info: "" };
+  // ομάδες ανά κατάσταση + μέλος + ημερομηνία: «1-24 βρέθηκαν από @X στις 25/10/2026 20:11»
+  const when = (d) => { const m = String(d || "").match(/^(\d{4})-(\d\d)-(\d\d) (\d\d:\d\d)/); return m ? ` στις ${m[3]}/${m[2]}/${m[1]} ${m[4]}` : ""; };
+  const groups = new Map();
+  for (const [n, st] of dup) {
+    const e = cur.get(n);
+    const by = st === "missing" ? "" : e.u || e.b ? ` από ${ownerTag(e)}${when(e.d)}` : " (παλιά καταχώριση)";
+    const k = `${st}|${by}`;
+    (groups.get(k) || groups.set(k, []).get(k)).push(n);
+  }
+  const word = { found: "βρέθηκαν", partial: "με ελλείψεις", missing: "λείπουν ήδη" };
+  const parts = [...groups].slice(0, 6).map(([k, ns]) => {
+    const [st, by] = k.split("|");
+    return `${compress(ns)} ${word[st]}${by}`;
+  });
+  return { ops: kept, info: `Υπάρχουν ήδη ενημερωμένα στη βάση — επεισόδια ${parts.join(" · ")}${groups.size > 6 ? " …" : ""}.` };
+}
+
 async function handleSay(it, env) {
   const text = String(opt(it, "κείμενο") || "").slice(0, 500);
   const user = it.member?.user || it.user || {};
@@ -342,8 +395,10 @@ async function handleSay(it, env) {
     }
     const g = await guard(it, env, row, ops);
     if (g.deny) return followup(it, { content: head + "🛑 " + g.deny });
-    ops = g.ops;
-    const lines = ops.map(opLine).join("\n") + (g.warn ? "\n\n⚠️ " + g.warn : "");
+    const al = await already(env, row, g.ops);
+    ops = al.ops;
+    if (!ops.length) return followup(it, { content: head + "ℹ️ " + al.info + (g.warn ? "\n⚠️ " + g.warn : "") + "\nΔεν χρειάζεται καμία αλλαγή." });
+    const lines = ops.map(opLine).join("\n") + (al.info ? "\n\nℹ️ " + al.info : "") + (g.warn ? "\n\n⚠️ " + g.warn : "");
     const payload = b64u(JSON.stringify({ k: `${row.c}:${row.i}`, o: ops, u: user.id }));
     return followup(it, {
       content: head,
@@ -425,7 +480,10 @@ async function handle(it, env, ctx) {
   try { range = parseRange(opt(it, "επεισόδια"), row.n); } catch (e) { return reply(e.message, true); }
   const g = await guard(it, env, row, [{ state, range }]);
   if (g.deny) return reply("🛑 " + g.deny, true);
-  range = g.ops[0].range;
+  const al = await already(env, row, g.ops);
+  if (!al.ops.length) return reply("ℹ️ " + al.info + (g.warn ? "\n⚠️ " + g.warn : "") + "\nΔεν χρειάζεται καμία αλλαγή.", true);
+  range = al.ops[0].range;
+  const extra = (al.info ? "\nℹ️ " + al.info : "") + (g.warn ? "\n⚠️ " + g.warn : "");
   const note = state === "partial" ? String(opt(it, "σημείωση") || "").slice(0, 200) : "";
   const by = it.member?.user?.global_name || it.member?.user?.username || it.user?.username || "Discord";
 
@@ -436,7 +494,7 @@ async function handle(it, env, ctx) {
   }
   cache.at = 0;
   const label = { found: "✅ βρέθηκαν", partial: "🟧 με ελλείψεις", missing: "↩️ σημειώθηκαν ως λείπουν" }[state];
-  return reply(`**${row.t}** · ${row.cn} — επεισόδια ${range} ${label}${note ? ` («${note}»)` : ""}.\n` +
+  return reply(`**${row.t}** · ${row.cn} — επεισόδια ${range} ${label}${note ? ` («${note}»)` : ""}.${extra}\n` +
     `Το site ενημερώνεται σε 1–2 λεπτά.`);
 }
 

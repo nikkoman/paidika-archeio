@@ -49,8 +49,9 @@
   Cloudflare https://dash.cloudflare.com/?to=/:account/workers/services/view/paidika-bot/production
 - Εντολές (`discord/commands.json`, καταχώριση με workflow «Καταχώριση εντολών Discord»):
   `/πες` (απλή γλώσσα μέσω Claude Haiku, με κουμπί Επιβεβαίωση· δέχεται και σκέτη σημείωση ανά επεισόδιο, op `"note"` στο `batch`, που προστίθεται χωρίς αλλαγή κατάστασης· κενή = διαγραφή), `/βρέθηκε`, `/ελλείψεις`, `/λείπει`, `/πρόοδος`.
-- Failsafe (στον κώδικα του Worker, `guard`): μία σειρά ανά αίτημα· χωρίς δικαιώματα διαχειριστή (Discord usernames `dr_slump` = ιδιοκτήτης, `diafanos`, `tasmanix` — λίστα `ADMINS` στο worker.js — ή `ADMIN_ROLE_ID`)
+- Failsafe (στον κώδικα του Worker, `guard`): μία σειρά ανά αίτημα· χωρίς δικαιώματα διαχειριστή (Discord usernames στο **`data/admins.json`** — ο ιδιοκτήτης ζητά «βάλε/βγάλε admin τον Χ» και απλώς αλλάζουμε αυτό το αρχείο, χωρίς deploy· το bot το ξαναδιαβάζει κάθε λεπτό· `dr_slump` = ιδιοκτήτης, πάντα admin· εφεδρικά `ADMINS` στο worker.js, ή `ADMIN_ROLE_ID`· **μην** ορίζεται `ADMIN_USERS` στο Cloudflare γιατί παρακάμπτει το αρχείο)
   «λείπει» έως 10 επεισόδια τη φορά και μόνο σε επεισόδια που πέρασε ο ίδιος (όχι άλλο μέλος ή παλιές καταχωρίσεις).
+  Ό,τι υπάρχει ήδη με την ίδια κατάσταση αφαιρείται με ℹ️ «υπάρχει ήδη ενημερωμένο στη βάση από @Χ στις …».
   Τα μη επιτρεπτά αφαιρούνται από το αίτημα και τα υπόλοιπα περνούν, με ⚠️ που γράφει ποιο μέλος (tag από το Discord id `u` ανά επεισόδιο).
 - Ροή: Worker → GitHub `repository_dispatch` → `.github/workflows/archive-update.yml` → commit → Pages.
   Το workflow **δεν** έχει concurrency group (ακύρωνε αιτήματα σε αναμονή)· σε σύγκρουση ξαναεφαρμόζει πάνω στο τελευταίο main.
