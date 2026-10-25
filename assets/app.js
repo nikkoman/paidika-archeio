@@ -34,6 +34,9 @@
     $("#search").value = query; $("#sort").value = sortBy;
     return u.y || 0;
   }
+  // ύψος της σταθερής μπάρας, ώστε οι σειρές που ανοίγουν να μην κρύβονται από κάτω της
+  if (window.ResizeObserver) new ResizeObserver(([e]) =>
+    document.documentElement.style.setProperty("--bar-h", e.target.offsetHeight + "px")).observe($("#bar"));
   if ("scrollRestoration" in history) history.scrollRestoration = "manual";
   let saveT = 0;
   window.addEventListener("scroll", () => { clearTimeout(saveT); saveT = setTimeout(saveUI, 200); }, { passive: true });
@@ -272,10 +275,12 @@
       current = DATA.channels[0];
       const y = restoreUI();
       $("#lock").hidden = true; $("#app").hidden = false;
+      document.documentElement.classList.remove("has-pw");
       renderAll();
       if (y) requestAnimationFrame(() => window.scrollTo({ top: y }));
     } catch (err) {
       store.del(KEY);
+      document.documentElement.classList.remove("has-pw");
       if (!silent) msg.textContent = err.message === "load" ? "Δεν φορτώθηκαν τα δεδομένα. Δοκίμασε ξανά." : "Λάθος κωδικός.";
     }
   }
