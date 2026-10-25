@@ -419,7 +419,7 @@
   // ο τίτλος = αρχική: πρώτη καρτέλα, χωρίς αναζήτηση/φίλτρα/ανοιχτές σειρές, στην κορυφή
   $("#home").addEventListener("click", (e) => {
     e.preventDefault();
-    current = DATA.channels[0]; filter = "all"; query = ""; sortBy = "title";
+    current = ALL; filter = "all"; query = ""; sortBy = "title";
     kinds.clear(); open.clear();
     $("#search").value = ""; $("#sort").value = "title";
     renderAll(); window.scrollTo({ top: 0 }); saveUI();
@@ -435,7 +435,7 @@
       // καρτέλες από το κανάλι με τις περισσότερες σειρές προς τις λιγότερες (σταθερή ταξινόμηση στις ισοπαλίες)
       DATA.channels.sort((a, b) => b.series.length - a.series.length);
       indexWorks(); buildAll();
-      current = DATA.channels[0];
+      current = ALL;
       const y = restoreUI();
       $("#lock").hidden = true; $("#app").hidden = false;
       document.documentElement.classList.remove("has-pw");
