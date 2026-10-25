@@ -9,7 +9,7 @@
   python3 tools/archive.py decrypt /tmp/archive.json      # αποκρυπτογράφηση σε αρχείο ΕΚΤΟΣ repo
   python3 tools/archive.py encrypt /tmp/archive.json      # κρυπτογράφηση πίσω στο data/archive.enc.json
   python3 tools/archive.py mark ant1 mr-bogus 1-12 found  # σήμανση επεισοδίων (found|partial|missing)
-  python3 tools/archive.py mark ant1 mr-bogus 7 partial "λείπουν 2 λεπτά στο τέλος"
+  python3 tools/archive.py mark ant1 mr-bogus 7 partial "λείπουν 2 λεπτά στο τέλος" [όνομα]   # όνομα: ποιος το σημείωσε (b/d στο επεισόδιο)
   python3 tools/archive.py batch ant1 mr-bogus '[{"range":"34","state":"note","note":"λείπουν 4 δευτ."}]'  # σημείωση χωρίς αλλαγή κατάστασης
   python3 tools/archive.py total ant1 nintama-rantaro 42   # ορισμός συνόλου επεισοδίων
   python3 tools/archive.py find bogus                      # αναζήτηση σειράς (κανάλι + id)
@@ -32,6 +32,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ENC = os.path.join(ROOT, "data", "archive.enc.json")
 INDEX = os.path.join(ROOT, "data", "index.enc.json")
 TITLES = os.path.join(ROOT, "data", "titles.enc.json")
+WHO = os.path.join(ROOT, "data", "who.enc.json")
 ITER = 250_000
 
 
@@ -87,11 +88,29 @@ def write_index(obj):
         eps = v.get("eplist") or []
         if any(e.get("t") for e in eps):
             titles[w] = [(f"S{e['s']:02d}E{e['e']:02d} " if e.get("s") else "") + (e.get("t") or "") for e in eps]
-    for path, data in ((INDEX, rows), (TITLES, titles)):
+    # ποιος σημείωσε τι και πότε, ανά μεταγλώττιση: {dub: [[επ, κατάσταση, όνομα, ημ/νία, σημείωση], ...]}
+    who = {}
+    for dub, v in obj.get("dubs", {}).items():
+        lst = [[int(n), e.get("s"), e.get("b"), e.get("d"), e.get("n", "")] for n, e in v.get("episodes", {}).items() if e.get("b")]
+        if lst:
+            who[dub] = sorted(lst)
+    for path, data in ((INDEX, rows), (TITLES, titles), (WHO, who)):
         iv = os.urandom(12)
         ct = AESGCM(base64.b64decode(k)).encrypt(iv, json.dumps(data, ensure_ascii=False, separators=(",", ":")).encode("utf-8"), None)
         json.dump({"v": 1, "iv": base64.b64encode(iv).decode(), "ct": base64.b64encode(ct).decode()}, open(path, "w", encoding="utf-8"))
     return True
+
+
+def stamp(by):
+    """Ποιος και πότε (ώρα Ελλάδας) σημείωσε ένα επεισόδιο."""
+    if not by:
+        return {}
+    try:
+        from zoneinfo import ZoneInfo
+        now = datetime.datetime.now(ZoneInfo("Europe/Athens"))
+    except Exception:
+        now = datetime.datetime.now()
+    return {"b": by[:40], "d": now.strftime("%Y-%m-%d %H:%M")}
 
 
 def get_series(obj, ch, sid):
@@ -137,11 +156,12 @@ def main():
         dub = obj["dubs"].setdefault(s["dub"], {"episodes": {}})
         state = {"found": "f", "partial": "p", "missing": None}[args[3]]
         note = args[4] if len(args) > 4 else None
+        who = stamp(args[5] if len(args) > 5 else None)
         for n in parse_range(args[2]):
             if state is None:
                 dub["episodes"].pop(str(n), None)
             else:
-                e = {"s": state}
+                e = {"s": state, **who}
                 if note:
                     e["n"] = note
                 dub["episodes"][str(n)] = e
@@ -151,6 +171,7 @@ def main():
         s = get_series(obj, args[0], args[1])
         dub = obj["dubs"].setdefault(s["dub"], {"episodes": {}})
         ops = json.loads(args[2])
+        who = stamp(args[3] if len(args) > 3 else None)
         order = {"found": 0, "missing": 1, "partial": 2, "note": 3}
         for op in sorted(ops, key=lambda o: order.get(o.get("state"), 9)):
             if op["state"] == "note":       # σημείωση χωρίς αλλαγή κατάστασης· κενή σημείωση = διαγραφή
@@ -163,13 +184,15 @@ def main():
                         e.pop("n", None)
                     elif note not in e.get("n", ""):
                         e["n"] = (e["n"] + " · " + note if e.get("n") else note)[:200]
+                        if who:
+                            e["nb"], e["nd"] = who["b"], who["d"]
                 continue
             state = {"found": "f", "partial": "p", "missing": None}[op["state"]]
             for n in parse_range(op["range"]):
                 if state is None:
                     dub["episodes"].pop(str(n), None)
                 else:
-                    e = {"s": state}
+                    e = {"s": state, **who}
                     if op.get("note") and state == "p":
                         e["n"] = op["note"][:200]
                     dub["episodes"][str(n)] = e

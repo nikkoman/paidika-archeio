@@ -196,7 +196,7 @@
       for (let i = 1; i <= t; i++) {
         const e = E[String(i)], cls = e ? e.s : "";
         const other = badgeDubs.some((o) => epsOf(o.s)[String(i)]);
-        const tip = `Επεισόδιο ${i}: ${e ? (e.s === "f" ? "βρέθηκε" : "βρέθηκε με ελλείψεις") : "λείπει"}${e && e.n ? " — " + e.n : ""}`;
+        const tip = `Επεισόδιο ${i}: ${e ? (e.s === "f" ? "βρέθηκε" : "βρέθηκε με ελλείψεις") : "λείπει"}${e && e.n ? " — " + e.n : ""}${e && e.b ? ` (${e.b}, ${e.d})` : ""}`;
         cells.push(`<span class="ep ${cls}${e && e.n ? " has-note" : ""}${other ? " other" : ""}" title="${esc(tip)}">${i}</span>`);
       }
       grid = `<div class="eps">${cells.join("")}</div>`;
