@@ -167,6 +167,8 @@ def main():
                 dub["episodes"].pop(str(n), None)
             else:
                 e = {"s": state, **who}
+                if dub["episodes"].get(str(n), {}).get("src"):   # οι πηγές (src) μένουν όταν αλλάζει η κατάσταση
+                    e["src"] = dub["episodes"][str(n)]["src"]
                 if note:
                     e["n"] = note
                 dub["episodes"][str(n)] = e
@@ -205,6 +207,8 @@ def main():
                     dub["episodes"].pop(str(n), None)
                 else:
                     e = {"s": state, **who}
+                    if dub["episodes"].get(str(n), {}).get("src"):
+                        e["src"] = dub["episodes"][str(n)]["src"]
                     if op.get("note") and state == "p":
                         e["n"] = op["note"][:200]
                     dub["episodes"][str(n)] = e
