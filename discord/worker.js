@@ -6,7 +6,8 @@
 //   INDEX_KEY           το ίδιο κλειδί με το GitHub secret ARCHIVE_INDEX_KEY
 //   ANTHROPIC_API_KEY   κλειδί API του Claude (console.anthropic.com) για την εντολή /πες
 //   ALLOWED_ROLE_ID     (προαιρετικό) μόνο μέλη με αυτόν τον ρόλο αλλάζουν δεδομένα
-//   ADMIN_ROLE_ID       (προαιρετικό) ρόλος διαχειριστή· οι Administrator/Manage Server του Discord μετράνε ήδη ως διαχειριστές
+//   ADMIN_USERS         (προαιρετικό) Discord usernames διαχειριστών, χωρισμένα με κόμμα (αντικαθιστά τη λίστα ADMINS)
+//   ADMIN_ROLE_ID       (προαιρετικό) ρόλος διαχειριστή
 
 const REPO = "nikkoman/paidika-archeio";
 const INDEX_URL = "https://nikkoman.github.io/paidika-archeio/data/index.enc.json";
@@ -239,10 +240,13 @@ const opLine = (o) => o.state === "count"
 
 // ---------- failsafe: τι επιτρέπεται χωρίς δικαιώματα διαχειριστή ----------
 const MAX_REMOVE = 10;
+// Διαχειριστές = Discord usernames (όχι nicknames). Χωρίς περιορισμούς στο failsafe.
+const ADMINS = ["dr_slump", "diafanos", "tasmanix"];
 const displayName = (it) => { const u = it.member?.user || it.user || {}; return u.global_name || u.username || "Discord"; };
 function isAdmin(it, env) {
-  const perms = BigInt(it.member?.permissions || 0);
-  if (perms & 0x8n || perms & 0x20n) return true; // Administrator ή Manage Server
+  const username = String((it.member?.user || it.user || {}).username || "").toLowerCase();
+  const admins = env.ADMIN_USERS ? String(env.ADMIN_USERS).split(",").map((u) => u.trim().toLowerCase()) : ADMINS;
+  if (username && admins.includes(username)) return true;
   return !!(env.ADMIN_ROLE_ID && (it.member?.roles || []).includes(env.ADMIN_ROLE_ID));
 }
 function expand(spec) {

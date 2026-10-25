@@ -45,7 +45,7 @@
   Ο ιδιοκτήτης τον επικολλά χειροκίνητα στο Cloudflare (Edit code → Deploy) μετά από κάθε αλλαγή.
 - Εντολές (`discord/commands.json`, καταχώριση με workflow «Καταχώριση εντολών Discord»):
   `/πες` (απλή γλώσσα μέσω Claude Haiku, με κουμπί Επιβεβαίωση· δέχεται και σκέτη σημείωση ανά επεισόδιο, op `"note"` στο `batch`, που προστίθεται χωρίς αλλαγή κατάστασης· κενή = διαγραφή), `/βρέθηκε`, `/ελλείψεις`, `/λείπει`, `/πρόοδος`.
-- Failsafe (στον κώδικα του Worker, `guard`): μία σειρά ανά αίτημα· χωρίς δικαιώματα διαχειριστή (Administrator/Manage Server ή `ADMIN_ROLE_ID`)
+- Failsafe (στον κώδικα του Worker, `guard`): μία σειρά ανά αίτημα· χωρίς δικαιώματα διαχειριστή (Discord usernames `dr_slump` = ιδιοκτήτης, `diafanos`, `tasmanix` — λίστα `ADMINS` στο worker.js — ή `ADMIN_ROLE_ID`)
   «λείπει» έως 10 επεισόδια τη φορά και μόνο σε επεισόδια που πέρασε ο ίδιος (όχι άλλο μέλος ή παλιές καταχωρίσεις).
 - Ροή: Worker → GitHub `repository_dispatch` → `.github/workflows/archive-update.yml` → commit → Pages.
 - Secrets Worker: `DISCORD_PUBLIC_KEY`, `GITHUB_TOKEN`, `INDEX_KEY`, `ANTHROPIC_API_KEY` (προαιρ. `ALLOWED_ROLE_ID`).
