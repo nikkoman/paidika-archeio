@@ -84,7 +84,7 @@ def write_index(obj):
             cl = obj.get("dubs", {}).get(s.get("dub"), {}).get("claim")
             u = max(0, min(cl["n"], t or cl["n"]) - f - p) if cl else 0
             rows.append({"c": c["id"], "cn": c["name"], "i": s["id"], "t": s["title"], "n": t, "f": f, "p": p, "u": u,
-                         "d": s.get("dub"), "w": s.get("work"), **({"cl": cl} if cl else {})})
+                         "d": s.get("dub"), "w": s.get("work"), **({"g": s["gr"]} if s.get("gr") else {}), **({"cl": cl} if cl else {})})
     # τίτλοι επεισοδίων ανά έργο (θέση στη λίστα = αριθμός επεισοδίου), για να βρίσκει το /πες επεισόδια από τον τίτλο
     titles = {}
     for w, v in obj.get("works", {}).items():

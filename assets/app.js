@@ -2,7 +2,7 @@
   "use strict";
   const $ = (s) => document.querySelector(s);
   const KEY = "pa-pw";
-  let DATA = null, current = null, filter = "all", query = "", sortBy = "title";
+  let DATA = null, current = null, filter = "all", query = "", sortBy = "title", scope = "all"; // scope: αναζήτηση σε "all" κανάλια ή "ch" (μόνο το τρέχον)
   const kinds = new Set(); // empty = όλα
   const open = new Set();
 
@@ -23,13 +23,13 @@
   };
   function saveUI() {
     if (!current) return;
-    ui.set(JSON.stringify({ ch: current.id, filter, query, sortBy, kinds: [...kinds], open: [...open], y: window.scrollY }));
+    ui.set(JSON.stringify({ ch: current.id, filter, query, sortBy, scope, kinds: [...kinds], open: [...open], y: window.scrollY }));
   }
   function restoreUI() {
     let u; try { u = JSON.parse(ui.get() || "null"); } catch { u = null; }
     if (!u) return 0;
     current = DATA.channels.find((c) => c.id === u.ch) || current;
-    filter = u.filter || "all"; query = u.query || ""; sortBy = u.sortBy || "title";
+    filter = u.filter || "all"; query = u.query || ""; sortBy = u.sortBy || "title"; scope = u.scope || "all";
     (u.kinds || []).forEach((k) => kinds.add(k)); (u.open || []).forEach((k) => open.add(k));
     $("#search").value = query; $("#sort").value = sortBy;
     return u.y || 0;
@@ -167,29 +167,38 @@
   }
   const norm = (s) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
   function renderList() {
-    const q = norm(query.trim());
-    const rows = current.series.filter((s) => {
-      if (q && !norm(s.title).includes(q)) return false;
+    const q = norm(query.trim()), global = q && scope === "all";
+    renderScope();
+    // με αναζήτηση σε όλα τα κανάλια, η λίστα έχει σειρές από κάθε κανάλι (με το λογότυπό του)
+    const pool = global ? DATA.channels.flatMap((ch) => ch.series.map((s) => ({ ch, s }))) : current.series.map((s) => ({ ch: current, s }));
+    const rows = pool.filter(({ s }) => {
+      if (q && !norm(s.title + " " + (s.gr || "")).includes(q)) return false;
       if (kinds.size && !kindsOf(s).some((k) => kinds.has(k))) return false;
       const x = stats(s), got = x.f + x.p + x.u;
       if (filter === "some") return got > 0;
       if (filter === "done") return x.t > 0 && got >= x.t;
       if (filter === "none") return got === 0;
       return true;
-    }).sort(sorter);
+    }).sort((a, b) => sorter(a.s, b.s));
     $("#empty").hidden = rows.length > 0;
-    $("#list").innerHTML = rows.map((s) => {
-      const x = stats(s), isOpen = open.has(current.id + "/" + s.id);
+    $("#list").innerHTML = rows.map(({ ch, s }) => {
+      const x = stats(s), isOpen = open.has(ch.id + "/" + s.id);
       const meta = [s.kind === "Μικτό" ? "Κινούμενα σχέδια & ζωντανής δράσης" : s.kind, s.years, s.aired ? `1η προβολή ${s.airedApprox ? "~" : ""}${s.aired}${s.dubyear && s.dubyear !== s.aired ? ` (μεταγλ. ${s.dubyear})` : ""}` : s.dubyear ? `μεταγλ. ${s.dubyear}` : "", s.channel].filter(Boolean).join(" · ");
       return `<li class="item${isOpen ? " open" : ""}">
-        <button class="row" data-id="${esc(s.id)}" aria-expanded="${isOpen}">
+        <button class="row" data-ch="${ch.id}" data-id="${esc(s.id)}" aria-expanded="${isOpen}">
           ${pie(x.f, x.p, x.t, 30, 7, x.u)}
-          <span class="ttl">${s.img ? `<img class="ava" src="${esc(s.img)}" alt="" loading="lazy">` : ""}<span><span class="t">${esc(s.title)}</span>${copyBtn(s.title, "Αντιγραφή τίτλου")}<br><span class="m">${esc(meta)}</span></span></span>
+          <span class="ttl">${global ? `<span class="logo" title="${esc(ch.name)}"><img src="assets/logos/${ch.id}.png" alt="${esc(ch.name)}"></span>` : ""}${s.img ? `<img class="ava" src="${esc(s.img)}" alt="" loading="lazy">` : ""}<span><span class="t">${esc(s.title)}</span>${copyBtn(s.title, "Αντιγραφή τίτλου")}<br><span class="m">${esc(meta)}</span></span></span>
           <span class="count">${x.t ? `<b>${x.f + x.p + x.u}</b> / ${x.t}` : "—"}${x.u ? `<span class="unk" title="${x.u} από αυτά: άγνωστο ποια">?</span>` : ""}${(BYWORK[s.work] || []).length > 1 ? `<span class="multi" title="Προβλήθηκε και σε άλλο κανάλι">⇄</span>` : ""}<span class="chev">›</span></span>
         </button>
         ${isOpen ? detail(s) : ""}
       </li>`;
     }).join("");
+  }
+  function renderScope() {
+    const b = $("#scope"), all = scope === "all";
+    b.setAttribute("aria-pressed", all);
+    b.textContent = all ? "Όλα τα κανάλια" : "Μόνο " + current.name;
+    $("#search").placeholder = all ? "Αναζήτηση σε όλα τα κανάλια…" : "Αναζήτηση στο " + current.name + "…";
   }
   function detail(s) {
     const E = epsOf(s), t = totalOf(s), L = listOf(s);
@@ -266,6 +275,7 @@
     renderKinds(); renderList(); saveUI();
   });
   $("#sort").addEventListener("change", (e) => { sortBy = e.target.value; renderList(); saveUI(); });
+  $("#scope").addEventListener("click", () => { scope = scope === "all" ? "ch" : "all"; renderList(); saveUI(); });
   $("#search").addEventListener("input", (e) => { query = e.target.value; renderList(); saveUI(); });
   $("#list").addEventListener("click", (e) => {
     const cp = e.target.closest(".cp");
@@ -282,7 +292,7 @@
       return;
     }
     const b = e.target.closest(".row"); if (!b) return;
-    const k = current.id + "/" + b.dataset.id;
+    const k = (b.dataset.ch || current.id) + "/" + b.dataset.id;
     open.has(k) ? open.delete(k) : open.add(k);
     renderList(); saveUI();
   });

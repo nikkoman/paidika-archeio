@@ -29,11 +29,12 @@
   Batman: The Animated Series ANT1 65· τα 20 επόμενα χωριστή σειρά «Adventures of Batman & Robin, The» (`work` g123-br, ίδια καταχώριση GreekDubDB).
 - Αποφάσεις για μεταγλωττίσεις (έλεγχος GreekDubDB, 10/2026): Heathcliff MEGA (1989) χωριστά από STAR (1993) ·
   Les Nouvelles Aventures de Lucky Luke μόνο ALTER (η ΕΡΤ2 έχει δική της του 2017) · Delfy ΕΡΤ/ALTER διαφορετικές μεταγλωττίσεις.
+- Δεν μπαίνει σειρά σε κανάλι όπου μεταγλωττίστηκε μόνο ένα ειδικό/μεμονωμένο επεισόδιο (π.χ. DuckTales MEGA = μόνο «A DuckTales Valentine», Tintin 1957 ALTER = μόνο «Υπόθεση Κάλκιουλους»· αφαιρέθηκαν 10/2026).
 - Εικόνες χαρακτήρων: **δεν** τις αναζητούμε/ανεβάζουμε εμείς (πνευματικά δικαιώματα)· μόνο URL που δίνει ο χρήστης (`archive.py image`).
 
 ## Δομή δεδομένων
 - `data/archive.enc.json`: όλα τα δεδομένα, κρυπτογραφημένα (AES-GCM, PBKDF2-SHA256 από τον κωδικό του site).
-- `channels[].series[]` → `id, title, kind, years, aired, airedApprox, dubyear, total, notes, gddb, channel(ΕΡΤ), img, work, dub`.
+- `channels[].series[]` → `id, title, gr (ελληνικός τίτλος GreekDubDB· για αναζήτηση site και /πες), kind, years, aired, airedApprox, dubyear, total, notes, gddb, channel(ΕΡΤ), img, work, dub`.
 - `works{work: {eplist}}` (λίστα επεισοδίων ανά έργο) · `dubs{dub: {episodes: {"7": {"s":"f|p","n":"…","b":"όνομα","d":"YYYY-MM-DD HH:MM"}}}}` (πρόοδος ανά μεταγλώττιση· `b/d` = ποιος/πότε, ώρα Ελλάδας, από το Discord).
   Προαιρετικά `dubs[dub].claim = {n, b, d}`: «έχουμε n επεισόδια, άγνωστο ποια» (`archive.py claim` ή op `count` στο `batch`)· το site δείχνει τα μη σημειωμένα ως «άγνωστο ποια» (μπλε).
   Ίδια μεταγλώττιση σε 2 κανάλια = ίδιο `dub` → κοινή πρόοδος. `work` = GreekDubDB title id (`g123`).
