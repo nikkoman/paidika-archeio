@@ -1,0 +1,19 @@
+name: Καταχώριση εντολών Discord
+
+on:
+  workflow_dispatch:
+
+jobs:
+  register:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Αποστολή εντολών στο Discord
+        env:
+          APP_ID: ${{ secrets.DISCORD_APP_ID }}
+          BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+          GUILD_ID: ${{ secrets.DISCORD_GUILD_ID }}
+        run: |
+          if [ -n "$GUILD_ID" ]; then URL="https://discord.com/api/v10/applications/$APP_ID/guilds/$GUILD_ID/commands";
+          else URL="https://discord.com/api/v10/applications/$APP_ID/commands"; fi
+          curl -sS -f -X PUT "$URL" -H "Authorization: Bot $BOT_TOKEN" -H "Content-Type: application/json" --data @discord/commands.json

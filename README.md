@@ -41,3 +41,14 @@ python3 tools/archive.py splitdub star babar
 Τα επεισόδια που λείπουν απλώς δεν αναφέρονται. Τίτλοι που ξεκινούν με «The» γράφονται «Tick, The».
 
 Πηγή στοιχείων σειρών: [GreekDubDB](https://www.greekdubdb.com).
+
+## Discord bot
+
+Εντολές στο Discord: `/βρέθηκε`, `/ελλείψεις`, `/λείπει`, `/πρόοδος` (με αυτόματη συμπλήρωση σειράς).
+Ροή: Discord → Cloudflare Worker (`discord/worker.js`) → GitHub `repository_dispatch` →
+workflow `Ενημέρωση αρχείου` (`.github/workflows/archive-update.yml`) → commit στα δεδομένα → GitHub Pages.
+
+Μυστικά GitHub (Settings → Secrets and variables → Actions):
+`ARCHIVE_PASSWORD`, `ARCHIVE_INDEX_KEY`, `DISCORD_APP_ID`, `DISCORD_BOT_TOKEN`, `DISCORD_GUILD_ID`.
+Μυστικά Worker: `DISCORD_PUBLIC_KEY`, `GITHUB_TOKEN`, `INDEX_KEY` (= ARCHIVE_INDEX_KEY), προαιρετικά `ALLOWED_ROLE_ID`.
+Οι εντολές καταχωρούνται στο Discord με το workflow `Καταχώριση εντολών Discord` (Run workflow).

@@ -12,6 +12,7 @@
   python3 tools/archive.py mark ant1 mr-bogus 7 partial "λείπουν 2 λεπτά στο τέλος"
   python3 tools/archive.py total ant1 nintama-rantaro 42   # ορισμός συνόλου επεισοδίων
   python3 tools/archive.py find bogus                      # αναζήτηση σειράς (κανάλι + id)
+  python3 tools/archive.py index                           # ευρετήριο για το Discord bot (θέλει ARCHIVE_INDEX_KEY)
   python3 tools/archive.py eplist ant1 mr-bogus eps.json   # λίστα επεισοδίων: [{"s":1,"e":1,"t":"Τίτλος"}, ...]
                                                            # (για anime χωρίς κύκλους: "s": null, "e" = απόλυτος αριθμός)
   python3 tools/archive.py image ant1 mr-bogus https://...  # εικόνα σειράς (URL) ή "none"
@@ -28,6 +29,7 @@ from cryptography.hazmat.primitives import hashes
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ENC = os.path.join(ROOT, "data", "archive.enc.json")
+INDEX = os.path.join(ROOT, "data", "index.enc.json")
 ITER = 250_000
 
 
@@ -63,6 +65,25 @@ def save(obj, pw):
     json.dump(encrypt_obj(obj, pw), open(ENC, "w", encoding="utf-8"))
 
 
+def write_index(obj):
+    """Μικρό κρυπτογραφημένο ευρετήριο για το Discord bot (γρήγορο κλειδί AES, χωρίς PBKDF2)."""
+    k = os.environ.get("ARCHIVE_INDEX_KEY")
+    if not k:
+        return False
+    rows = []
+    for c in obj["channels"]:
+        for s in c["series"]:
+            eps = obj.get("dubs", {}).get(s.get("dub"), {}).get("episodes", {})
+            t = s.get("total") or len(obj.get("works", {}).get(s.get("work"), {}).get("eplist") or [])
+            f = sum(1 for n, e in eps.items() if e.get("s") == "f" and (not t or int(n) <= t))
+            p = sum(1 for n, e in eps.items() if e.get("s") == "p" and (not t or int(n) <= t))
+            rows.append({"c": c["id"], "cn": c["name"], "i": s["id"], "t": s["title"], "n": t, "f": f, "p": p})
+    iv = os.urandom(12)
+    ct = AESGCM(base64.b64decode(k)).encrypt(iv, json.dumps(rows, ensure_ascii=False, separators=(",", ":")).encode("utf-8"), None)
+    json.dump({"v": 1, "iv": base64.b64encode(iv).decode(), "ct": base64.b64encode(ct).decode()}, open(INDEX, "w", encoding="utf-8"))
+    return True
+
+
 def get_series(obj, ch, sid):
     for c in obj["channels"]:
         if c["id"] == ch:
@@ -92,6 +113,8 @@ def main():
         json.dump(load(pw), open(args[0], "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     elif cmd == "encrypt":
         save(json.load(open(args[0], encoding="utf-8")), pw)
+    elif cmd == "index":
+        print("index:", write_index(load(pw)))
     elif cmd == "find":
         q = args[0].lower()
         for c in load(pw)["channels"]:
