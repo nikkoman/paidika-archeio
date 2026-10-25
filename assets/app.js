@@ -180,7 +180,7 @@
           <span>${x.done} σειρές ολοκληρωμένες · ${x.any} με κάτι</span></div>
       </div>`;
   }
-  const FILTERS = [["all", "Όλες"], ["some", "Έχει βρεθεί κάτι"], ["done", "Ολοκληρωμένες"], ["none", "Τίποτα ακόμα"]];
+  const FILTERS = [["all", "Όλες"], ["some", "Έχει βρεθεί κάτι"], ["almost", "Σχεδόν όλο"], ["done", "Ολοκληρωμένες"], ["none", "Τίποτα ακόμα"]];
   function renderChips() {
     $("#chips").innerHTML = FILTERS.map(([k, l]) =>
       `<button class="chip" data-f="${k}" aria-pressed="${filter === k}">${l}</button>`).join("");
@@ -212,6 +212,7 @@
       if (kinds.size && !kindsOf(s).some((k) => kinds.has(k))) return false;
       const x = stats(s), got = x.f + x.p + x.u;
       if (filter === "some") return got > 0;
+      if (filter === "almost") return x.t > 0 && got < x.t && got >= 0.75 * x.t;
       if (filter === "done") return x.t > 0 && got >= x.t;
       if (filter === "none") return got === 0;
       return true;
