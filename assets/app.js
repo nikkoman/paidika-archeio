@@ -290,6 +290,14 @@
     const cp = e.target.closest(".cp");
     if (cp && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); e.stopPropagation(); copyText(cp.dataset.copy, cp); }
   });
+  // ο τίτλος = αρχική: πρώτη καρτέλα, χωρίς αναζήτηση/φίλτρα/ανοιχτές σειρές, στην κορυφή
+  $("#home").addEventListener("click", (e) => {
+    e.preventDefault();
+    current = DATA.channels[0]; filter = "all"; query = ""; sortBy = "title";
+    kinds.clear(); open.clear();
+    $("#search").value = ""; $("#sort").value = "title";
+    renderAll(); window.scrollTo({ top: 0 }); saveUI();
+  });
   $("#logout").addEventListener("click", () => { store.del(KEY); ui.del(); location.reload(); });
 
   async function start(pw, silent) {
