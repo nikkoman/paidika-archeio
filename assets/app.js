@@ -149,7 +149,7 @@
     $("#chips").innerHTML = FILTERS.map(([k, l]) =>
       `<button class="chip" data-f="${k}" aria-pressed="${filter === k}">${l}</button>`).join("");
   }
-  const KINDS = [["Anime", "Anime"], ["Κινούμενα σχέδια", "Cartoon"], ["Ζωντανής δράσης", "Live action"]];
+  const KINDS = [["Anime", "Anime"], ["Κινούμενα σχέδια", "Cartoon"], ["Ζωντανής δράσης", "Live action"], ["Εκπομπή", "Εκπομπές"]];
   const kindsOf = (s) => s.kind === "Μικτό" ? ["Κινούμενα σχέδια", "Ζωντανής δράσης"] : [s.kind];
   function renderKinds() {
     $("#kinds").innerHTML = `<button class="chip" data-k="" aria-pressed="${kinds.size === 0}">Όλα</button>` +
@@ -160,7 +160,7 @@
     const t = a.title.localeCompare(b.title, "en", { sensitivity: "base" });
     if (sortBy === "title") return t;
     const [field, dir] = sortBy.split("-");
-    const va = field === "prod" ? year(a.years) : year(a.aired), vb = field === "prod" ? year(b.years) : year(b.aired);
+    const va = field === "prod" ? year(a.years) : year(a.aired || a.dubyear), vb = field === "prod" ? year(b.years) : year(b.aired || b.dubyear);
     if (va === vb) return t;
     if (va === null) return 1; if (vb === null) return -1;
     return dir === "asc" ? va - vb : vb - va;
@@ -180,7 +180,7 @@
     $("#empty").hidden = rows.length > 0;
     $("#list").innerHTML = rows.map((s) => {
       const x = stats(s), isOpen = open.has(current.id + "/" + s.id);
-      const meta = [s.kind === "Μικτό" ? "Κινούμενα σχέδια & ζωντανής δράσης" : s.kind, s.years, s.aired ? `1η προβολή ${s.airedApprox ? "~" : ""}${s.aired}${s.dubyear && s.dubyear !== s.aired ? ` (μεταγλ. ${s.dubyear})` : ""}` : "", s.channel].filter(Boolean).join(" · ");
+      const meta = [s.kind === "Μικτό" ? "Κινούμενα σχέδια & ζωντανής δράσης" : s.kind, s.years, s.aired ? `1η προβολή ${s.airedApprox ? "~" : ""}${s.aired}${s.dubyear && s.dubyear !== s.aired ? ` (μεταγλ. ${s.dubyear})` : ""}` : s.dubyear ? `μεταγλ. ${s.dubyear}` : "", s.channel].filter(Boolean).join(" · ");
       return `<li class="item${isOpen ? " open" : ""}">
         <button class="row" data-id="${esc(s.id)}" aria-expanded="${isOpen}">
           ${pie(x.f, x.p, x.t, 30, 7, x.u)}
