@@ -15,12 +15,18 @@
 
   // ---------- κατάσταση οθόνης (επιβιώνει την ανανέωση της σελίδας) ----------
   const UI = "pa-ui";
+  // η θέση στη σελίδα κρατιέται στο localStorage, ώστε να επιβιώνει και όταν ο browser σβήνει το sessionStorage
+  const ui = {
+    get: () => { try { return localStorage.getItem(UI); } catch { return null; } },
+    set: (v) => { try { localStorage.setItem(UI, v); } catch {} },
+    del: () => { try { localStorage.removeItem(UI); } catch {} },
+  };
   function saveUI() {
     if (!current) return;
-    store.set(UI, JSON.stringify({ ch: current.id, filter, query, sortBy, kinds: [...kinds], open: [...open], y: window.scrollY }));
+    ui.set(JSON.stringify({ ch: current.id, filter, query, sortBy, kinds: [...kinds], open: [...open], y: window.scrollY }));
   }
   function restoreUI() {
-    let u; try { u = JSON.parse(store.get(UI) || "null"); } catch { u = null; }
+    let u; try { u = JSON.parse(ui.get() || "null"); } catch { u = null; }
     if (!u) return 0;
     current = DATA.channels.find((c) => c.id === u.ch) || current;
     filter = u.filter || "all"; query = u.query || ""; sortBy = u.sortBy || "title";
@@ -254,7 +260,7 @@
     open.has(k) ? open.delete(k) : open.add(k);
     renderList(); saveUI();
   });
-  $("#logout").addEventListener("click", () => { store.del(KEY); store.del(UI); location.reload(); });
+  $("#logout").addEventListener("click", () => { store.del(KEY); ui.del(); location.reload(); });
 
   async function start(pw, silent) {
     const msg = $("#lock-msg");
