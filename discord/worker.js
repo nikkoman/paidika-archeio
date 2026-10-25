@@ -1,4 +1,4 @@
-// Discord bot του Αρχείου Παιδικών Μεταγλωττίσεων — Cloudflare Worker
+// Discord bot του Αρχείου Μεταγλωττίσεων Παιδικών Σειρών — Cloudflare Worker
 //
 // Μυστικά (Settings → Variables and Secrets του Worker):
 //   DISCORD_PUBLIC_KEY  δημόσιο κλειδί της εφαρμογής (Discord Developer Portal → General Information)
@@ -558,7 +558,7 @@ export default {
         } catch (e) { out.push("Σφάλμα: " + e.name + " " + e.message); }
         return new Response(out.join("\n"), { headers: { "content-type": "text/plain; charset=utf-8" } });
       }
-      return new Response("Αρχείο Παιδικών Μεταγλωττίσεων — Discord bot", { status: 200, headers: { "content-type": "text/plain; charset=utf-8" } });
+      return new Response("Αρχείο Μεταγλωττίσεων Παιδικών Σειρών — Discord bot", { status: 200, headers: { "content-type": "text/plain; charset=utf-8" } });
     }
     const body = await req.text();
     if (!(await verify(req, body, env))) return new Response("invalid signature", { status: 401 });
