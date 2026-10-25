@@ -211,3 +211,18 @@ select#sort {
 .ob img { max-height: 10px; max-width: 34px; }
 .row .ttl { display: flex; align-items: center; gap: 12px; min-width: 0; }
 img.ava { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; flex: none; background: var(--line); }
+/* αναζήτηση: σε όλα τα κανάλια ή μόνο στο τρέχον */
+.scope { flex: none; white-space: nowrap; padding: 10px 12px; border-radius: 10px; }
+.ttl > .logo { flex: none; height: 22px; padding: 2px 6px; margin-right: 8px; }
+.ttl > .logo img { max-height: 15px; max-width: 56px; }
+@media (max-width: 560px) {
+  .bar .controls { flex-wrap: wrap; gap: 8px; }
+  .bar #search { flex-basis: 100%; }
+  .bar #sort { flex: 1; max-width: none; }
+  /* στο κινητό οι καρτέλες μικραίνουν (χωρίς ποσοστό) ώστε η σταθερή μπάρα να μην πιάνει μισή οθόνη */
+  .tabs { gap: 5px; }
+  .tab { padding: 4px; gap: 0; }
+  .tab small { display: none; }
+  .tab .logo { height: 24px; padding: 2px 5px; }
+  .tab .logo img { max-height: 16px; max-width: 54px; }
+}
