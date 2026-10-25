@@ -264,7 +264,11 @@
     const otherDubs = others.filter((o) => o.s.dub !== s.dub);
     const seenDub = new Set();
     const badgeDubs = otherDubs.filter((o) => !seenDub.has(o.s.dub) && seenDub.add(o.s.dub));
-    const badges = (i) => badgeDubs.map((o) => {
+    // λογότυπα δίπλα στην κατάσταση: σε ποια κανάλια έχει βρεθεί το επεισόδιο (και το τρέχον), όταν η σειρά παίχτηκε σε >1 κανάλι
+    const seenCh = new Set();
+    const badgeChs = [{ ch: null, s }, ...others].map((o) => o.ch ? o : { ch: (BYWORK[s.work] || []).find((x) => x.s === s)?.ch, s })
+      .filter((o) => o.ch && !seenCh.has(o.ch.id) && seenCh.add(o.ch.id));
+    const badges = (i) => badgeChs.length < 2 ? "" : badgeChs.map((o) => {
       const e = epsOf(o.s)[String(i)];
       return e ? `<span class="ob ${e.s}" title="${esc(o.ch.name)}: ${e.s === "f" ? "βρέθηκε" : "με ελλείψεις"}${e.n ? " — " + esc(e.n) : ""}"><img src="assets/logos/${o.ch.id}.png" alt="${esc(o.ch.name)}"></span>` : "";
     }).join("");
