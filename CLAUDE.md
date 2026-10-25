@@ -19,6 +19,10 @@
 ## Πηγές & κανόνες δεδομένων
 - Κύρια πηγή σειρών: GreekDubDB (network pages: ANT1 id=9, MEGA 4, STAR 2, ΣΚΑΪ 101, ALTER 22,
   ΕΡΤ 3,5,8,18,223,71,37,219). Μόνο πρωτότυποι τίτλοι· «The X» γράφεται «X, The».
+  Τίτλος σε άλλη ευρωπαϊκή γλώσσα (γαλλικά, ιταλικά, γερμανικά…): **αγγλικός τίτλος και σε παρένθεση ο πρωτότυπος**
+  (π.χ. «Shagma: Spartakus and the Sun Beneath the Sea (Les Mondes Engloutis)», «New Adventures of Lucky Luke, The (Les Nouvelles…)»)·
+  επίσημος αγγλικός όπου υπάρχει, αλλιώς μετάφραση. Οι ιαπωνικοί τίτλοι μένουν όπως είναι. Λίστα 10/2026: `/mnt/project-files/titloi/agglikoi-titloi.md`.
+- Αντιστοίχιση επεισοδίων από αρχεία (π.χ. .mp4): ο **τίτλος** του αρχείου μετράει περισσότερο από την αρίθμηση.
 - Έτος παραγωγής = το έτος δίπλα στον τύπο στη σελίδα τίτλου της GreekDubDB (`t-year`)· αυτό κρίνει αν μπαίνει μια σειρά (≤ 2009).
 - Έτη προβολής: «1η προβολή» = έτος μεταγλώττισης GreekDubDB, ποτέ πριν την ίδρυση του καναλιού
   (ANT1 1990, MEGA 1989, STAR/ΣΚΑΪ 1993, ALTER 1994)· τότε `airedApprox: true` και `dubyear` κρατά το αρχικό.
@@ -32,7 +36,7 @@
   Fairly OddParents: Disney κύκλοι 1–4 (92), Nickelodeon κύκλοι 5–10 (177, χωριστό `work` g293-s5) ·
   Batman: The Animated Series ANT1 65· τα 20 επόμενα χωριστή σειρά «Adventures of Batman & Robin, The» (`work` g123-br, ίδια καταχώριση GreekDubDB).
 - Αποφάσεις για μεταγλωττίσεις (έλεγχος GreekDubDB, 10/2026): Heathcliff MEGA (1989) χωριστά από STAR (1993) ·
-  Les Nouvelles Aventures de Lucky Luke μόνο ALTER (η ΕΡΤ2 έχει δική της του 2017) · Delfy ΕΡΤ/ALTER διαφορετικές μεταγλωττίσεις.
+  New Adventures of Lucky Luke (Les Nouvelles Aventures…) μόνο ALTER (η ΕΡΤ2 έχει δική της του 2017) · Delfy ΕΡΤ/ALTER διαφορετικές μεταγλωττίσεις.
 - Δεν μπαίνει σειρά σε κανάλι όπου μεταγλωττίστηκε μόνο ένα ειδικό/μεμονωμένο επεισόδιο (π.χ. DuckTales MEGA = μόνο «A DuckTales Valentine», Tintin 1957 ALTER = μόνο «Υπόθεση Κάλκιουλους»· αφαιρέθηκαν 10/2026).
 - Εικόνες χαρακτήρων: **δεν** τις αναζητούμε/ανεβάζουμε εμείς (πνευματικά δικαιώματα)· μόνο URL που δίνει ο χρήστης (`archive.py image`).
 
