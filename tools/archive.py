@@ -11,6 +11,7 @@
   python3 tools/archive.py mark ant1 mr-bogus 1-12 found  # σήμανση επεισοδίων (found|partial|missing)
   python3 tools/archive.py mark ant1 mr-bogus 7 partial "λείπουν 2 λεπτά στο τέλος" [όνομα]   # όνομα: ποιος το σημείωσε (b/d στο επεισόδιο)
   python3 tools/archive.py batch ant1 mr-bogus '[{"range":"34","state":"note","note":"λείπουν 4 δευτ."}]'  # σημείωση χωρίς αλλαγή κατάστασης
+  python3 tools/archive.py claim ant1 mr-bogus 45 [όνομα] # «έχουμε 45, άγνωστο ποια» (0 = διαγραφή)
   python3 tools/archive.py total ant1 nintama-rantaro 42   # ορισμός συνόλου επεισοδίων
   python3 tools/archive.py find bogus                      # αναζήτηση σειράς (κανάλι + id)
   python3 tools/archive.py index                           # ευρετήριο για το Discord bot (θέλει ARCHIVE_INDEX_KEY)
@@ -80,8 +81,10 @@ def write_index(obj):
             t = s.get("total") or len(obj.get("works", {}).get(s.get("work"), {}).get("eplist") or [])
             f = sum(1 for n, e in eps.items() if e.get("s") == "f" and (not t or int(n) <= t))
             p = sum(1 for n, e in eps.items() if e.get("s") == "p" and (not t or int(n) <= t))
-            rows.append({"c": c["id"], "cn": c["name"], "i": s["id"], "t": s["title"], "n": t, "f": f, "p": p,
-                         "d": s.get("dub"), "w": s.get("work")})
+            cl = obj.get("dubs", {}).get(s.get("dub"), {}).get("claim")
+            u = max(0, min(cl["n"], t or cl["n"]) - f - p) if cl else 0
+            rows.append({"c": c["id"], "cn": c["name"], "i": s["id"], "t": s["title"], "n": t, "f": f, "p": p, "u": u,
+                         "d": s.get("dub"), "w": s.get("work"), **({"cl": cl} if cl else {})})
     # τίτλοι επεισοδίων ανά έργο (θέση στη λίστα = αριθμός επεισοδίου), για να βρίσκει το /πες επεισόδια από τον τίτλο
     titles = {}
     for w, v in obj.get("works", {}).items():
@@ -174,6 +177,13 @@ def main():
         who = stamp(args[3] if len(args) > 3 else None)
         order = {"found": 0, "missing": 1, "partial": 2, "note": 3}
         for op in sorted(ops, key=lambda o: order.get(o.get("state"), 9)):
+            if op["state"] == "count":      # «έχουμε Ν, άγνωστο ποια»· 0 = διαγραφή
+                n = int(op.get("count") or 0)
+                if n > 0:
+                    dub["claim"] = {"n": n, **who}
+                else:
+                    dub.pop("claim", None)
+                continue
             if op["state"] == "note":       # σημείωση χωρίς αλλαγή κατάστασης· κενή σημείωση = διαγραφή
                 note = (op.get("note") or "").strip()
                 for n in parse_range(op["range"]):
@@ -196,6 +206,15 @@ def main():
                     if op.get("note") and state == "p":
                         e["n"] = op["note"][:200]
                     dub["episodes"][str(n)] = e
+        save(obj, pw)
+    elif cmd == "claim":     # claim ant1 mr-bogus 45 [όνομα] — έχουμε 45 επεισόδια χωρίς να ξέρουμε ποια (0 = διαγραφή)
+        obj = load(pw)
+        s = get_series(obj, args[0], args[1])
+        dub = obj["dubs"].setdefault(s["dub"], {"episodes": {}})
+        if int(args[2]) > 0:
+            dub["claim"] = {"n": int(args[2]), **stamp(args[3] if len(args) > 3 else None)}
+        else:
+            dub.pop("claim", None)
         save(obj, pw)
     elif cmd == "total":
         obj = load(pw)

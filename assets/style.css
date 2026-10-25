@@ -8,6 +8,7 @@
   --partial: #f0a520;
   --missing: #e0605e;
   --missing-soft: #f7d6d5;
+  --unknown: #8fb8e8;
   --accent: #2e2a6b;
   --ch: #2e2a6b;
   --radius: 14px;
@@ -121,6 +122,10 @@ button.ghost { background: transparent; color: var(--muted); border: 1px solid v
 .row .m { color: var(--muted); font-size: 12.5px; }
 .row .count { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 13px; text-align: right; white-space: nowrap; }
 .row .count b { color: var(--ink); }
+.row .count .unk { display: inline-grid; place-items: center; width: 16px; height: 16px; margin-left: 4px; border-radius: 50%;
+  background: var(--unknown); color: #fff; font-size: 11px; font-weight: 700; vertical-align: 1px; }
+.claim { margin: 10px 0; padding: 10px 12px; border-radius: 10px; font-size: 13.5px;
+  background: color-mix(in srgb, var(--unknown) 18%, transparent); border-left: 4px solid var(--unknown); }
 .row .chev { display: inline-block; margin-left: 8px; transition: transform .15s; }
 .item.open .row .chev { transform: rotate(90deg); }
 
