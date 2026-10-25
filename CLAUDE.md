@@ -38,6 +38,7 @@
   Batman: The Animated Series ANT1 65· τα 20 επόμενα χωριστή σειρά «Adventures of Batman & Robin, The» (`work` g123-br, ίδια καταχώριση GreekDubDB).
 - Αποφάσεις για μεταγλωττίσεις (έλεγχος GreekDubDB, 10/2026): Heathcliff MEGA (1989) χωριστά από STAR (1993) ·
   New Adventures of Lucky Luke (Les Nouvelles Aventures…) μόνο ALTER (η ΕΡΤ2 έχει δική της του 2017) · Delfy ΕΡΤ/ALTER διαφορετικές μεταγλωττίσεις.
+- Δεν μπαίνει τίποτα με **1 μόνο επεισόδιο** (1/1: ειδικά, making-of κ.λπ.· αφαιρέθηκαν 10/2026 Power Rangers: Secrets Revealed, Jim Button, Lampies, Boule et Bill 2004).
 - Δεν μπαίνει σειρά σε κανάλι όπου μεταγλωττίστηκε μόνο ένα ειδικό/μεμονωμένο επεισόδιο (π.χ. DuckTales MEGA = μόνο «A DuckTales Valentine», Tintin 1957 ALTER = μόνο «Υπόθεση Κάλκιουλους»· αφαιρέθηκαν 10/2026).
 - **Μόνο έργα με μεταγλώττιση/φωνές.** Δεν μπαίνουν μαγκαζίνα που απλώς πρόβαλλαν άλλες σειρές, ούτε ταινίες
   (Ουράνιο Τόξο ΕΡΤ, Legend of the North Wind K-T.V. αφαιρέθηκαν 10/2026). **Μένουν** όμως οι εκπομπές με μεταγλωττισμένο
