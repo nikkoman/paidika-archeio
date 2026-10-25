@@ -257,26 +257,65 @@ function expand(spec) {
   }
   return out;
 }
-// Επιστρέφει μήνυμα άρνησης ή null. Ελέγχει: πόσα επεισόδια αφαιρούνται και αν ανήκουν σε άλλο μέλος.
+// «77, 79 (@diafanos), 80 (@tasmanix)»: tag μέλους μετά από κάθε συνεχόμενη ομάδα ίδιου μέλους
+// (tag όταν έχουμε Discord id — χωρίς ειδοποίηση, βλ. allowed_mentions — αλλιώς το όνομα)
+const ownerTag = (o) => o.u ? `<@${o.u}>` : o.b || "παλιά καταχώριση";
+function withOwners(eps, byEp) {
+  const out = [], list = eps.slice(0, 10);
+  list.forEach((n, i) => {
+    const o = byEp.get(n), next = list[i + 1];
+    out.push(next !== undefined && ownerTag(byEp.get(next)) === ownerTag(o) ? String(n) : `${n} (${ownerTag(o)})`);
+  });
+  return out.join(", ") + (eps.length > 10 ? "…" : "");
+}
+// «1-3,5» από [1,2,3,5]
+function compress(nums) {
+  const s = [...new Set(nums)].sort((x, y) => x - y), out = [];
+  for (let i = 0; i < s.length; i++) {
+    let j = i;
+    while (j + 1 < s.length && s[j + 1] === s[j] + 1) j++;
+    out.push(i === j ? `${s[i]}` : `${s[i]}-${s[j]}`);
+    i = j;
+  }
+  return out.join(",");
+}
+// Αφαιρεί από το αίτημα ό,τι δεν επιτρέπεται και κρατά τα υπόλοιπα.
+// Επιστρέφει { ops, warn } (warn = τι παραλείφθηκε και γιατί) ή { deny } αν δεν μένει τίποτα.
 async function guard(it, env, row, ops) {
-  if (isAdmin(it, env)) return null;
+  if (isAdmin(it, env)) return { ops, warn: "" };
   const me = displayName(it);
   const removing = ops.filter((o) => o.state === "missing").flatMap((o) => expand(o.range));
   if (removing.length > MAX_REMOVE)
-    return `Για ασφάλεια, «λείπει» γίνεται έως ${MAX_REMOVE} επεισόδια τη φορά (ζήτησες ${removing.length}). Για περισσότερα, ρώτα έναν διαχειριστή.`;
+    return { deny: `Για ασφάλεια, «λείπει» γίνεται έως ${MAX_REMOVE} επεισόδια τη φορά (ζήτησες ${removing.length}). Για περισσότερα, ρώτα έναν διαχειριστή.` };
   const marks = row.d ? (await who(env))[row.d] || [] : [];
-  const byEp = new Map(marks.map(([n, , b]) => [n, b]));
-  // επεισόδια που έχουν βρεθεί από άλλο μέλος ή από παλιά καταχώριση χωρίς όνομα (όσα δεν έχουν βρεθεί δεν πειράζονται)
-  const foreign = removing.filter((n) => byEp.has(n) && byEp.get(n) !== me);
+  const byEp = new Map(marks.map(([n, , b, , , u]) => [n, { b, u }]));
+  const myId = (it.member?.user || it.user || {}).id;
+  const mine = (o) => (o.u && myId ? o.u === myId : o.b === me);
+  const foreignOf = (o) => byEp.has(o) && !mine(byEp.get(o));
+  const warns = [];
+  // «λείπει» σε επεισόδια άλλου μέλους ή παλιάς καταχώρισης χωρίς όνομα (όσα δεν έχουν βρεθεί δεν πειράζονται)
+  const foreign = removing.filter(foreignOf);
   if (foreign.length)
-    return `Τα επεισόδια ${foreign.slice(0, 10).join(", ")}${foreign.length > 10 ? "…" : ""} τα είχε περάσει άλλο μέλος. Μπορείς να αναιρέσεις μόνο ό,τι πέρασες εσύ — για τα υπόλοιπα ρώτα έναν διαχειριστή.`;
-  const clearing = ops.filter((o) => o.state === "note" && !o.note).flatMap((o) => expand(o.range));
-  const foreignNotes = clearing.filter((n) => byEp.has(n) && byEp.get(n) !== me);
+    warns.push(`Τα επεισόδια ${withOwners(foreign, byEp)} τα είχε περάσει άλλο μέλος, οπότε δεν τα αλλάζω. Μπορείς να αναιρέσεις μόνο ό,τι πέρασες εσύ — για τα υπόλοιπα ρώτα έναν διαχειριστή.`);
+  const foreignNotes = ops.filter((o) => o.state === "note" && !o.note).flatMap((o) => expand(o.range)).filter(foreignOf);
   if (foreignNotes.length)
-    return `Η σημείωση στα επεισόδια ${foreignNotes.slice(0, 10).join(", ")} είναι από άλλο μέλος — μόνο ένας διαχειριστής μπορεί να τη σβήσει.`;
-  if (ops.some((o) => o.state === "count" && !o.count) && row.cl && row.cl.b !== me)
-    return "Το «έχουμε Ν, άγνωστο ποια» το είχε περάσει άλλο μέλος — μόνο εκείνο ή ένας διαχειριστής μπορεί να το σβήσει.";
-  return null;
+    warns.push(`Η σημείωση στα επεισόδια ${withOwners(foreignNotes, byEp)} είναι από άλλο μέλος — μόνο ένας διαχειριστής μπορεί να τη σβήσει.`);
+  const claimBlocked = row.cl && !mine(row.cl);
+  const kept = [];
+  for (const o of ops) {
+    if (o.state === "count" && !o.count && claimBlocked) {
+      warns.push(`Το «έχουμε Ν, άγνωστο ποια» το είχε περάσει άλλο μέλος (${ownerTag(row.cl)}) — μόνο εκείνο ή ένας διαχειριστής μπορεί να το σβήσει.`);
+      continue;
+    }
+    if (o.state === "missing" || (o.state === "note" && !o.note)) {
+      const left = expand(o.range).filter((n) => !foreignOf(n));
+      if (left.length) kept.push({ ...o, range: compress(left) });
+      continue;
+    }
+    kept.push(o);
+  }
+  const warn = warns.join("\n");
+  return kept.length ? { ops: kept, warn } : { deny: warn || "Δεν έμεινε τίποτα να αλλάξει." };
 }
 
 async function handleSay(it, env) {
@@ -290,7 +329,7 @@ async function handleSay(it, env) {
     if (a.kind !== "update") return followup(it, { content: head + a.message });
     const row = rows.find((r) => `${r.c}:${r.i}` === a.series_key);
     if (!row || !Array.isArray(a.ops) || !a.ops.length) return followup(it, { content: head + "Δεν κατάλαβα ποια σειρά ή ποια επεισόδια εννοείς — μπορείς να το γράψεις αλλιώς;" });
-    const ops = [];
+    let ops = [];
     for (const op of a.ops) {
       if (op.state === "count") {
         const n = Math.max(0, Math.floor(Number(op.count) || 0));
@@ -301,9 +340,10 @@ async function handleSay(it, env) {
       try { ops.push({ range: parseRange(op.range, row.n), state: op.state, note: op.state === "partial" || op.state === "note" ? String(op.note || "").slice(0, 200) : "" }); }
       catch (e) { return followup(it, { content: head + "⚠️ " + e.message }); }
     }
-    const denied = await guard(it, env, row, ops);
-    if (denied) return followup(it, { content: head + "🛑 " + denied });
-    const lines = ops.map(opLine).join("\n");
+    const g = await guard(it, env, row, ops);
+    if (g.deny) return followup(it, { content: head + "🛑 " + g.deny });
+    ops = g.ops;
+    const lines = ops.map(opLine).join("\n") + (g.warn ? "\n\n⚠️ " + g.warn : "");
     const payload = b64u(JSON.stringify({ k: `${row.c}:${row.i}`, o: ops, u: user.id }));
     return followup(it, {
       content: head,
@@ -335,12 +375,13 @@ async function handleButton(it, env) {
   const [c, id] = p.k.split(":");
   const rows = await index(env);
   const row = rows.find((r) => r.c === c && r.i === id) || { t: id };
-  const denied = await guard(it, env, row, p.o);
-  if (denied) return json({ type: 7, data: { embeds: [{ ...emb, description: "🛑 " + denied }], components: [] } });
-  await dispatch(env, { cmd: "batch", channel: c, id, ops: JSON.stringify(p.o), by: user.global_name || user.username || "Discord",
+  const g = await guard(it, env, row, p.o);
+  if (g.deny) return json({ type: 7, data: { embeds: [{ ...emb, description: "🛑 " + g.deny }], components: [] } });
+  p.o = g.ops;
+  await dispatch(env, { cmd: "batch", channel: c, id, ops: JSON.stringify(p.o), by: user.global_name || user.username || "Discord", uid: user.id,
     title: row.t, range: p.o.map((o) => o.state === "count" ? `πλήθος ${o.count}` : o.range).join(" "), state: "" });
   cache.at = 0;
-  const lines = p.o.map(opLine).join("\n");
+  const lines = p.o.map(opLine).join("\n") + (g.warn ? "\n\n⚠️ " + g.warn : "");
   return json({ type: 7, data: { embeds: [{ ...emb, description: `${lines}\n\n✅ **Καταχωρήθηκε.** Το site ενημερώνεται σε 1–2 λεπτά.` }], components: [] } });
 }
 
@@ -382,13 +423,14 @@ async function handle(it, env, ctx) {
   if (!state) return reply("Άγνωστη εντολή.", true);
   let range;
   try { range = parseRange(opt(it, "επεισόδια"), row.n); } catch (e) { return reply(e.message, true); }
-  const denied = await guard(it, env, row, [{ state, range }]);
-  if (denied) return reply("🛑 " + denied, true);
+  const g = await guard(it, env, row, [{ state, range }]);
+  if (g.deny) return reply("🛑 " + g.deny, true);
+  range = g.ops[0].range;
   const note = state === "partial" ? String(opt(it, "σημείωση") || "").slice(0, 200) : "";
   const by = it.member?.user?.global_name || it.member?.user?.username || it.user?.username || "Discord";
 
   try {
-    await dispatch(env, { cmd: "mark", channel: row.c, id: row.i, range, state, note, by, title: row.t });
+    await dispatch(env, { cmd: "mark", channel: row.c, id: row.i, range, state, note, by, uid: (it.member?.user || it.user || {}).id, title: row.t });
   } catch (e) {
     return reply(`Κάτι πήγε στραβά με την ενημέρωση (${e.message}). Δοκίμασε ξανά σε λίγο.`, true);
   }

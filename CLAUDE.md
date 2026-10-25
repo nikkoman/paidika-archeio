@@ -20,7 +20,8 @@
   Μορφή εμφάνισης SxxExxx· anime χωρίς κύκλους απόλυτη αρίθμηση (`"s": null`).
 - Αποφάσεις του χρήστη για σύνολα: TMNT 1987 ANT1 χωρίς Red Sky (169) · Captain Planet MEGA 65 · Nintama ANT1 47 (1ο intro) ·
   Dr. Slump ANT1 έως 50 · Pokémon STAR 587 (πριν το 16:9) · Thomas STAR/ALTER κύκλοι 1–10 (262, κοινή μεταγλώττιση) ·
-  Sesame Street ΕΡΤ 70s–80s, STAR 80s–90s (~2600, κατά προσέγγιση) · One Piece ALTER 106 · Oggy ALTER κύκλοι 1–2 (156 σκετς).
+  Sesame Street ΕΡΤ 70s–80s, STAR 80s–90s (~2600, κατά προσέγγιση) · One Piece ALTER 106 · Oggy ALTER κύκλοι 1–2 (156 σκετς) ·
+  Batman: The Animated Series ANT1 65· τα 20 επόμενα χωριστή σειρά «Adventures of Batman & Robin, The» (`work` g123-br, ίδια καταχώριση GreekDubDB).
 - Αποφάσεις για μεταγλωττίσεις (έλεγχος GreekDubDB, 10/2026): Heathcliff MEGA (1989) χωριστά από STAR (1993) ·
   Les Nouvelles Aventures de Lucky Luke μόνο ALTER (η ΕΡΤ2 έχει δική της του 2017) · Delfy ΕΡΤ/ALTER διαφορετικές μεταγλωττίσεις.
 - Εικόνες χαρακτήρων: **δεν** τις αναζητούμε/ανεβάζουμε εμείς (πνευματικά δικαιώματα)· μόνο URL που δίνει ο χρήστης (`archive.py image`).
@@ -47,7 +48,9 @@
   `/πες` (απλή γλώσσα μέσω Claude Haiku, με κουμπί Επιβεβαίωση· δέχεται και σκέτη σημείωση ανά επεισόδιο, op `"note"` στο `batch`, που προστίθεται χωρίς αλλαγή κατάστασης· κενή = διαγραφή), `/βρέθηκε`, `/ελλείψεις`, `/λείπει`, `/πρόοδος`.
 - Failsafe (στον κώδικα του Worker, `guard`): μία σειρά ανά αίτημα· χωρίς δικαιώματα διαχειριστή (Discord usernames `dr_slump` = ιδιοκτήτης, `diafanos`, `tasmanix` — λίστα `ADMINS` στο worker.js — ή `ADMIN_ROLE_ID`)
   «λείπει» έως 10 επεισόδια τη φορά και μόνο σε επεισόδια που πέρασε ο ίδιος (όχι άλλο μέλος ή παλιές καταχωρίσεις).
+  Τα μη επιτρεπτά αφαιρούνται από το αίτημα και τα υπόλοιπα περνούν, με ⚠️ που γράφει ποιο μέλος (tag από το Discord id `u` ανά επεισόδιο).
 - Ροή: Worker → GitHub `repository_dispatch` → `.github/workflows/archive-update.yml` → commit → Pages.
+  Το workflow **δεν** έχει concurrency group (ακύρωνε αιτήματα σε αναμονή)· σε σύγκρουση ξαναεφαρμόζει πάνω στο τελευταίο main.
 - Secrets Worker: `DISCORD_PUBLIC_KEY`, `GITHUB_TOKEN`, `INDEX_KEY`, `ANTHROPIC_API_KEY` (προαιρ. `ALLOWED_ROLE_ID`).
   Secrets GitHub: `ARCHIVE_PASSWORD`, `ARCHIVE_INDEX_KEY`, `DISCORD_APP_ID`, `DISCORD_BOT_TOKEN`, `DISCORD_GUILD_ID`.
 

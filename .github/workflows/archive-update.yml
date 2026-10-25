@@ -8,10 +8,6 @@ on:
     paths: [data/archive.enc.json]
   workflow_dispatch:
 
-concurrency:
-  group: archive-update
-  cancel-in-progress: false
-
 permissions:
   contents: write
 
@@ -25,10 +21,14 @@ jobs:
           python-version: "3.12"
       - run: pip install cryptography
 
-      - name: Εφαρμογή εντολής από το Discord
-        if: github.event_name == 'repository_dispatch'
+      # Χωρίς concurrency group: το GitHub κρατά μόνο ΕΝΑ run σε αναμονή και ακυρώνει τα υπόλοιπα,
+      # οπότε σε πολλά ταυτόχρονα αιτήματα από το Discord χάνονταν ενημερώσεις.
+      # Αντί γι' αυτό: εφαρμογή πάνω στο τελευταίο main → push· αν άλλο run πρόλαβε, ξανά από την αρχή.
+      - name: Εφαρμογή και αποθήκευση
         env:
           ARCHIVE_PASSWORD: ${{ secrets.ARCHIVE_PASSWORD }}
+          ARCHIVE_INDEX_KEY: ${{ secrets.ARCHIVE_INDEX_KEY }}
+          EVENT: ${{ github.event_name }}
           CMD: ${{ github.event.client_payload.cmd }}
           CH: ${{ github.event.client_payload.channel }}
           SID: ${{ github.event.client_payload.id }}
@@ -37,35 +37,32 @@ jobs:
           NOTE: ${{ github.event.client_payload.note }}
           OPS: ${{ github.event.client_payload.ops }}
           BY: ${{ github.event.client_payload.by }}
-        run: |
-          case "$CMD" in
-            mark)  python3 tools/archive.py mark "$CH" "$SID" "$RANGE" "$STATE" "$NOTE" "$BY" ;;
-            total) python3 tools/archive.py total "$CH" "$SID" "$RANGE" ;;
-            batch) python3 tools/archive.py batch "$CH" "$SID" "$OPS" "$BY" ;;
-            *) echo "Άγνωστη εντολή: $CMD"; exit 1 ;;
-          esac
-
-      - name: Ευρετήριο για το bot
-        env:
-          ARCHIVE_PASSWORD: ${{ secrets.ARCHIVE_PASSWORD }}
-          ARCHIVE_INDEX_KEY: ${{ secrets.ARCHIVE_INDEX_KEY }}
-        run: python3 tools/archive.py index
-
-      - name: Αποθήκευση
-        env:
-          BY: ${{ github.event.client_payload.by }}
+          BYID: ${{ github.event.client_payload.uid }}
           TITLE: ${{ github.event.client_payload.title }}
-          RANGE: ${{ github.event.client_payload.range }}
-          STATE: ${{ github.event.client_payload.state }}
         run: |
           git config user.name "Αρχείο bot"
           git config user.email "actions@users.noreply.github.com"
-          git add data/
-          if git diff --cached --quiet; then echo "Καμία αλλαγή"; exit 0; fi
-          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
-            MSG="Discord: ${BY} — ${TITLE} ${RANGE} ${STATE}"
-          else
-            MSG="Ενημέρωση ευρετηρίου"
-          fi
-          git commit -m "$MSG"
-          for i in 1 2 3; do git pull --rebase -q && git push && break; sleep 3; done
+          apply() {
+            if [ "$EVENT" = "repository_dispatch" ]; then
+              case "$CMD" in
+                mark)  python3 tools/archive.py mark "$CH" "$SID" "$RANGE" "$STATE" "$NOTE" "$BY" ;;
+                total) python3 tools/archive.py total "$CH" "$SID" "$RANGE" ;;
+                batch) python3 tools/archive.py batch "$CH" "$SID" "$OPS" "$BY" ;;
+                *) echo "Άγνωστη εντολή: $CMD"; return 1 ;;
+              esac || return 1
+              MSG="Discord: ${BY} — ${TITLE} ${RANGE} ${STATE}"
+            else
+              MSG="Ενημέρωση ευρετηρίου"
+            fi
+            python3 tools/archive.py index
+          }
+          for i in $(seq 1 10); do
+            git fetch -q origin main && git reset -q --hard origin/main
+            apply || exit 1
+            git add data/
+            if git diff --cached --quiet; then echo "Καμία αλλαγή"; exit 0; fi
+            git commit -q -m "$MSG"
+            if git push -q origin HEAD:main; then echo "OK (προσπάθεια $i)"; exit 0; fi
+            sleep $(( (RANDOM % 6) + 2 ))
+          done
+          echo "Δεν έγινε push μετά από 10 προσπάθειες"; exit 1
