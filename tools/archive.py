@@ -136,6 +136,23 @@ def main():
                     e["n"] = note
                 dub["episodes"][str(n)] = e
         save(obj, pw)
+    elif cmd == "batch":     # batch ant1 mr-bogus '[{"range":"1-6","state":"found"},{"range":"7","state":"partial","note":"..."}]'
+        obj = load(pw)
+        s = get_series(obj, args[0], args[1])
+        dub = obj["dubs"].setdefault(s["dub"], {"episodes": {}})
+        ops = json.loads(args[2])
+        order = {"found": 0, "missing": 1, "partial": 2}
+        for op in sorted(ops, key=lambda o: order.get(o.get("state"), 9)):
+            state = {"found": "f", "partial": "p", "missing": None}[op["state"]]
+            for n in parse_range(op["range"]):
+                if state is None:
+                    dub["episodes"].pop(str(n), None)
+                else:
+                    e = {"s": state}
+                    if op.get("note") and state == "p":
+                        e["n"] = op["note"][:200]
+                    dub["episodes"][str(n)] = e
+        save(obj, pw)
     elif cmd == "total":
         obj = load(pw)
         get_series(obj, args[0], args[1])["total"] = int(args[2]) if args[2] != "none" else None

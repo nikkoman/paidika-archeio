@@ -4,6 +4,7 @@
 //   DISCORD_PUBLIC_KEY  δημόσιο κλειδί της εφαρμογής (Discord Developer Portal → General Information)
 //   GITHUB_TOKEN        fine-grained token με δικαίωμα Contents: Read and write στο repository
 //   INDEX_KEY           το ίδιο κλειδί με το GitHub secret ARCHIVE_INDEX_KEY
+//   ANTHROPIC_API_KEY   κλειδί API του Claude (console.anthropic.com) για την εντολή /πες
 //   ALLOWED_ROLE_ID     (προαιρετικό) μόνο μέλη με αυτόν τον ρόλο αλλάζουν δεδομένα
 
 const REPO = "nikkoman/paidika-archeio";
@@ -68,7 +69,125 @@ async function dispatch(env, payload) {
   if (!r.ok) throw new Error(`GitHub ${r.status}`);
 }
 
-async function handle(it, env) {
+
+// ---------- /πες : απλή γλώσσα μέσω Claude ----------
+const MODEL = "claude-haiku-5-5";
+const b64u = (s) => btoa(unescape(encodeURIComponent(s))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+const unb64u = (s) => decodeURIComponent(escape(atob(s.replace(/-/g, "+").replace(/_/g, "/"))));
+
+const SYSTEM = `Είσαι ο βοηθός ενός ελληνικού Discord server που αρχειοθετεί ψηφιοποιήσεις (από VHS) μεταγλωττισμένων παιδικών σειρών της ελληνικής τηλεόρασης.
+Τα μέλη γράφουν σε απλή, καθημερινή γλώσσα (συχνά με greeklish ή ορθογραφικά λάθη) τι βρήκαν ή ρωτούν για την πρόοδο.
+Ο κατάλογος σειρών είναι στη μορφή: κλειδί|τίτλος|κανάλι|σύνολο επεισοδίων|βρέθηκαν|με ελλείψεις.
+Τα επεισόδια αριθμούνται 1..σύνολο με τη σειρά της λίστας του site (όχι S02E05). Αν κάποιος γράψει «2ος κύκλος επ. 3», μετέτρεψέ το μόνο αν είσαι σίγουρος· αλλιώς ρώτα.
+Κανόνες:
+- Καλείς ΠΑΝΤΑ το εργαλείο respond.
+- kind="update" μόνο όταν είσαι σίγουρος για τη σειρά ΚΑΙ για τα επεισόδια. Αν η σειρά ταιριάζει σε περισσότερα κανάλια και δεν διευκρινίζεται, kind="clarify" και ρώτα ποιο κανάλι, αναφέροντας τις επιλογές.
+- state: "found" (βρέθηκε), "partial" (βρέθηκε με ελλείψεις — πάντα με σύντομη σημείωση στα ελληνικά), "missing" (αναίρεση/λείπει).
+- range: π.χ. "1-12", "3,5,8". «όλα/ολόκληρο» = 1-σύνολο. Μην ξεπερνάς το σύνολο.
+- Αν κάποια επεισόδια ενός εύρους έχουν ελλείψεις, βάλε το εύρος ως found ΚΑΙ ξεχωριστά τα επεισόδια με ελλείψεις ως partial (υπερισχύουν).
+- kind="answer" για ερωτήσεις (π.χ. πόσα έχουμε) — απάντησε σύντομα από τον κατάλογο.
+- kind="clarify" αν κάτι είναι ασαφές. Μην μαντεύεις.
+- Γράφε message στα ελληνικά, φιλικά και σύντομα.`;
+
+const TOOL = {
+  name: "respond",
+  description: "Η απάντηση του bot",
+  input_schema: {
+    type: "object",
+    properties: {
+      kind: { type: "string", enum: ["update", "answer", "clarify"] },
+      series_key: { type: "string", description: "κλειδί σειράς από τον κατάλογο (μόνο για update)" },
+      ops: { type: "array", items: { type: "object", properties: {
+        range: { type: "string" }, state: { type: "string", enum: ["found", "partial", "missing"] },
+        note: { type: "string" } }, required: ["range", "state"] } },
+      message: { type: "string", description: "κείμενο προς τον χρήστη, στα ελληνικά" },
+    },
+    required: ["kind", "message"],
+  },
+};
+
+async function askClaude(env, rows, text) {
+  const catalog = rows.map((r) => `${r.c}:${r.i}|${r.t}|${r.cn}|${r.n || "?"}|${r.f}|${r.p}`).join("\n");
+  const r = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "x-api-key": env.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+    body: JSON.stringify({
+      model: env.MODEL || MODEL, max_tokens: 700,
+      system: [{ type: "text", text: SYSTEM }, { type: "text", text: "Κατάλογος:\n" + catalog, cache_control: { type: "ephemeral" } }],
+      tools: [TOOL], tool_choice: { type: "tool", name: "respond" },
+      messages: [{ role: "user", content: text }],
+    }),
+  });
+  if (!r.ok) throw new Error("Claude " + r.status + " " + (await r.text()).slice(0, 150));
+  const out = await r.json();
+  const use = (out.content || []).find((c) => c.type === "tool_use");
+  if (!use) throw new Error("χωρίς απάντηση");
+  return use.input;
+}
+
+async function followup(it, data) {
+  await fetch(`https://discord.com/api/v10/webhooks/${it.application_id}/${it.token}/messages/@original`, {
+    method: "PATCH", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ allowed_mentions: { parse: [] }, ...data }),
+  });
+}
+
+const STATE_LABEL = { found: "✅ βρέθηκαν", partial: "🟧 με ελλείψεις", missing: "↩️ λείπουν" };
+
+async function handleSay(it, env) {
+  const text = String(opt(it, "κείμενο") || "").slice(0, 500);
+  const user = it.member?.user || it.user || {};
+  try {
+    if (!env.ANTHROPIC_API_KEY) throw new Error("λείπει το ANTHROPIC_API_KEY");
+    const rows = await index(env);
+    const a = await askClaude(env, rows, text);
+    const head = `> ${text}\n`;
+    if (a.kind !== "update") return followup(it, { content: head + a.message });
+    const row = rows.find((r) => `${r.c}:${r.i}` === a.series_key);
+    if (!row || !Array.isArray(a.ops) || !a.ops.length) return followup(it, { content: head + "Δεν κατάλαβα ποια σειρά ή ποια επεισόδια εννοείς — μπορείς να το γράψεις αλλιώς;" });
+    const ops = [];
+    for (const op of a.ops) {
+      try { ops.push({ range: parseRange(op.range, row.n), state: op.state, note: op.state === "partial" ? String(op.note || "").slice(0, 200) : "" }); }
+      catch (e) { return followup(it, { content: head + "⚠️ " + e.message }); }
+    }
+    const lines = ops.map((o) => `${STATE_LABEL[o.state]}: επεισόδια **${o.range}**${o.note ? ` — «${o.note}»` : ""}`).join("\n");
+    const payload = b64u(JSON.stringify({ k: `${row.c}:${row.i}`, o: ops, u: user.id }));
+    return followup(it, {
+      content: head,
+      embeds: [{ title: `${row.t} · ${row.cn}`, url: SITE + "#p=" + payload, color: 0x2e2a6b,
+        description: `${a.message ? a.message + "\n\n" : ""}${lines}\n\n_Τίποτα δεν αλλάζει πριν πατήσεις Επιβεβαίωση._` }],
+      components: [{ type: 1, components: [
+        { type: 2, style: 3, label: "Επιβεβαίωση", custom_id: "say_ok" },
+        { type: 2, style: 4, label: "Ακύρωση", custom_id: "say_no" },
+      ] }],
+    });
+  } catch (e) {
+    return followup(it, { content: "Σφάλμα: " + e.message });
+  }
+}
+
+async function handleButton(it, env) {
+  const emb = it.message?.embeds?.[0];
+  const m = emb?.url?.match(/#p=([A-Za-z0-9_-]+)/);
+  if (!m) return json({ type: 7, data: { content: "Η πρόταση έληξε.", embeds: [], components: [] } });
+  const p = JSON.parse(unb64u(m[1]));
+  const user = it.member?.user || it.user || {};
+  if (p.u && user.id !== p.u) return reply("Μόνο όποιος έστειλε το μήνυμα μπορεί να το επιβεβαιώσει.", true);
+  if (it.data.custom_id === "say_no")
+    return json({ type: 7, data: { embeds: [{ ...emb, description: "❌ Ακυρώθηκε — δεν άλλαξε τίποτα." }], components: [] } });
+  if (env.ALLOWED_ROLE_ID && !(it.member?.roles || []).includes(env.ALLOWED_ROLE_ID))
+    return reply("Δεν έχεις δικαίωμα να αλλάζεις το αρχείο.", true);
+  const [c, id] = p.k.split(":");
+  const rows = await index(env);
+  const row = rows.find((r) => r.c === c && r.i === id) || { t: id };
+  await dispatch(env, { cmd: "batch", channel: c, id, ops: JSON.stringify(p.o), by: user.global_name || user.username || "Discord",
+    title: row.t, range: p.o.map((o) => o.range).join(" "), state: "" });
+  cache.at = 0;
+  const lines = p.o.map((o) => `${STATE_LABEL[o.state]}: επεισόδια **${o.range}**${o.note ? ` — «${o.note}»` : ""}`).join("\n");
+  return json({ type: 7, data: { embeds: [{ ...emb, description: `${lines}\n\n✅ **Καταχωρήθηκε.** Το site ενημερώνεται σε 1–2 λεπτά.` }], components: [] } });
+}
+
+async function handle(it, env, ctx) {
   // Αυτόματη συμπλήρωση ονόματος σειράς
   if (it.type === 4) {
     const q = norm(String((it.data.options || []).find((o) => o.focused)?.value || ""));
@@ -79,9 +198,14 @@ async function handle(it, env) {
     return json({ type: 8, data: { choices: hits.map((r) => ({
       name: `${r.t} · ${r.cn} (${r.f + r.p}/${r.n || "?"})`.slice(0, 100), value: `${r.c}:${r.i}` })) } });
   }
+  if (it.type === 3) return handleButton(it, env);
   if (it.type !== 2) return reply("Άγνωστη ενέργεια.", true);
 
   const cmd = it.data.name;
+  if (cmd === "πες") {
+    ctx.waitUntil(handleSay(it, env));
+    return json({ type: 5 }); // «Το bot σκέφτεται…»
+  }
   const rows = await index(env);
   const key = String(opt(it, "σειρά") || "");
   const row = rows.find((r) => `${r.c}:${r.i}` === key) || rows.find((r) => norm(r.t) === norm(key));
@@ -116,12 +240,13 @@ async function handle(it, env) {
 }
 
 export default {
-  async fetch(req, env) {
+  async fetch(req, env, ctx) {
     if (req.method !== "POST") {
       if (new URL(req.url).pathname === "/check") {
         const out = [];
         out.push("DISCORD_PUBLIC_KEY: " + (env.DISCORD_PUBLIC_KEY ? "ok (" + env.DISCORD_PUBLIC_KEY.length + " χαρακτήρες)" : "ΛΕΙΠΕΙ"));
         out.push("GITHUB_TOKEN: " + (env.GITHUB_TOKEN ? "ok" : "ΛΕΙΠΕΙ"));
+        out.push("ANTHROPIC_API_KEY: " + (env.ANTHROPIC_API_KEY ? "ok" : "ΛΕΙΠΕΙ (χρειάζεται για το /πες)"));
         out.push("INDEX_KEY: " + (env.INDEX_KEY ? "ok (" + env.INDEX_KEY.trim().length + " χαρακτήρες)" : "ΛΕΙΠΕΙ"));
         try {
           const r = await fetch(INDEX_URL + "?t=" + Date.now());
@@ -138,7 +263,7 @@ export default {
     if (!(await verify(req, body, env))) return new Response("invalid signature", { status: 401 });
     const it = JSON.parse(body);
     if (it.type === 1) return json({ type: 1 }); // PING
-    try { return await handle(it, env); }
+    try { return await handle(it, env, ctx); }
     catch (e) { return reply("Σφάλμα: " + e.message, true); }
   },
 };

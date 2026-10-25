@@ -52,3 +52,6 @@ workflow `Ενημέρωση αρχείου` (`.github/workflows/archive-update.
 `ARCHIVE_PASSWORD`, `ARCHIVE_INDEX_KEY`, `DISCORD_APP_ID`, `DISCORD_BOT_TOKEN`, `DISCORD_GUILD_ID`.
 Μυστικά Worker: `DISCORD_PUBLIC_KEY`, `GITHUB_TOKEN`, `INDEX_KEY` (= ARCHIVE_INDEX_KEY), προαιρετικά `ALLOWED_ROLE_ID`.
 Οι εντολές καταχωρούνται στο Discord με το workflow `Καταχώριση εντολών Discord` (Run workflow).
+
+Η εντολή `/πες` στέλνει το κείμενο του χρήστη στο Claude (μοντέλο Haiku) μαζί με τον κατάλογο σειρών,
+δείχνει τι κατάλαβε και περιμένει «Επιβεβαίωση» πριν στείλει ενημέρωση (cmd `batch`). Χρειάζεται το secret `ANTHROPIC_API_KEY` στο Worker.
