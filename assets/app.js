@@ -205,8 +205,8 @@
   function renderList() {
     const q = norm(query.trim()), global = q && scope === "all" && current !== ALL;
     renderScope();
-    // με αναζήτηση σε όλα τα κανάλια, η λίστα έχει σειρές από κάθε κανάλι (με το λογότυπό του)
-    const pool = global ? DATA.channels.flatMap((ch) => ch.series.map((s) => ({ ch, s }))) : current.series.map((s) => ({ ch: current, s }));
+    // με αναζήτηση σε όλα τα κανάλια, η λίστα είναι όπως στην καρτέλα «Όλα»: κάθε σειρά μία φορά, με τα λογότυπα των καναλιών της
+    const pool = (global ? ALL : current).series.map((s) => ({ ch: global ? ALL : current, s }));
     const rows = pool.filter(({ s }) => {
       if (q && !norm(s.title + " " + (s.gr || "")).includes(q)) return false;
       if (kinds.size && !kindsOf(s).some((k) => kinds.has(k))) return false;
@@ -223,7 +223,7 @@
       return `<li class="item${isOpen ? " open" : ""}">
         <button class="row" data-ch="${ch.id}" data-id="${esc(s.id)}" aria-expanded="${isOpen}">
           ${pie(x.f, x.p, x.t, 30, 7, x.u)}
-          <span class="ttl">${s.group ? `<span class="logos">${chipLogos(s.group)}</span>` : ""}${global ? `<span class="logo" title="${esc(ch.name)}"><img src="assets/logos/${ch.id}.png" alt="${esc(ch.name)}"></span>` : ""}${s.img ? `<img class="ava" src="${esc(s.img)}" alt="" loading="lazy">` : ""}<span><span class="t">${esc(s.title)}</span>${copyBtn(s.title, "Αντιγραφή τίτλου")}<br><span class="m">${esc(meta)}</span></span></span>
+          <span class="ttl">${s.group ? `<span class="logos">${chipLogos(s.group)}</span>` : ""}${s.img ? `<img class="ava" src="${esc(s.img)}" alt="" loading="lazy">` : ""}<span><span class="t">${esc(s.title)}</span>${copyBtn(s.title, "Αντιγραφή τίτλου")}<br><span class="m">${esc(meta)}</span></span></span>
           <span class="count">${x.t ? `<b>${x.f + x.p + x.u}</b> / ${x.t}` : "—"}${x.u ? `<span class="unk" title="${x.u} από αυτά: άγνωστο ποια">?</span>` : ""}${!s.group && (BYWORK[s.work] || []).length > 1 ? `<span class="multi" title="Προβλήθηκε και σε άλλο κανάλι">⇄</span>` : ""}<span class="chev">›</span></span>
         </button>
         ${isOpen ? (s.group ? groupDetail(s) : detail(s)) : ""}
