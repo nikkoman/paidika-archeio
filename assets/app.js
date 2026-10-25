@@ -103,6 +103,19 @@
 
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
+  // ---------- αντιγραφή στο clipboard (για επικόλληση στο /πες) ----------
+  const copyBtn = (text, label) =>
+    `<span class="cp" role="button" tabindex="0" title="${esc(label)}" aria-label="${esc(label)}" data-copy="${esc(text)}">📋</span>`;
+  async function copyText(text, el) {
+    try { await navigator.clipboard.writeText(text); }
+    catch {
+      const ta = document.createElement("textarea"); ta.value = text; document.body.appendChild(ta);
+      ta.select(); try { document.execCommand("copy"); } catch {} ta.remove();
+    }
+    el.textContent = "✓"; el.classList.add("ok");
+    setTimeout(() => { el.textContent = "📋"; el.classList.remove("ok"); }, 1200);
+  }
+
   // ---------- render ----------
   function renderTabs() {
     $("#tabs").innerHTML = DATA.channels.map((ch) => {
@@ -171,7 +184,7 @@
       return `<li class="item${isOpen ? " open" : ""}">
         <button class="row" data-id="${esc(s.id)}" aria-expanded="${isOpen}">
           ${pie(x.f, x.p, x.t, 30, 7, x.u)}
-          <span class="ttl">${s.img ? `<img class="ava" src="${esc(s.img)}" alt="" loading="lazy">` : ""}<span><span class="t">${esc(s.title)}</span><br><span class="m">${esc(meta)}</span></span></span>
+          <span class="ttl">${s.img ? `<img class="ava" src="${esc(s.img)}" alt="" loading="lazy">` : ""}<span><span class="t">${esc(s.title)}</span>${copyBtn(s.title, "Αντιγραφή τίτλου")}<br><span class="m">${esc(meta)}</span></span></span>
           <span class="count">${x.t ? `<b>${x.f + x.p + x.u}</b> / ${x.t}` : "—"}${x.u ? `<span class="unk" title="${x.u} από αυτά: άγνωστο ποια">?</span>` : ""}${(BYWORK[s.work] || []).length > 1 ? `<span class="multi" title="Προβλήθηκε και σε άλλο κανάλι">⇄</span>` : ""}<span class="chev">›</span></span>
         </button>
         ${isOpen ? detail(s) : ""}
@@ -195,7 +208,7 @@
         const e = E[String(i + 1)], st = e ? e.s : "m";
         const code = ep.s != null ? `S${pad(ep.s, 2)}E${pad(ep.e, 3)}` : pad(ep.e, 3);
         const lab = st === "f" ? "βρέθηκε" : st === "p" ? "με ελλείψεις" : "λείπει";
-        return `<li class="epl ${st}"><span class="code">${code}</span><span class="et">${esc(ep.t || "")}${e && e.n ? `<small>${esc(e.n)}</small>` : ""}</span><span class="st">${badges(i + 1)}<b>${lab}</b></span></li>`;
+        return `<li class="epl ${st}"><span class="code">${code}</span><span class="et">${esc(ep.t || "")}${copyBtn(`${s.title} ${code}${ep.t ? " " + ep.t : ""}`, "Αντιγραφή (σειρά, επεισόδιο, τίτλος)")}${e && e.n ? `<small>${esc(e.n)}</small>` : ""}</span><span class="st">${badges(i + 1)}<b>${lab}</b></span></li>`;
       }).join("");
       grid = `<ol class="eplist">${rows}</ol>`;
     } else if (t) {
@@ -255,6 +268,8 @@
   $("#sort").addEventListener("change", (e) => { sortBy = e.target.value; renderList(); saveUI(); });
   $("#search").addEventListener("input", (e) => { query = e.target.value; renderList(); saveUI(); });
   $("#list").addEventListener("click", (e) => {
+    const cp = e.target.closest(".cp");
+    if (cp) { e.stopPropagation(); copyText(cp.dataset.copy, cp); return; }
     const go = e.target.closest("[data-go]");
     if (go) {
       const [cid, sid] = go.dataset.go.split("|");
@@ -270,6 +285,10 @@
     const k = current.id + "/" + b.dataset.id;
     open.has(k) ? open.delete(k) : open.add(k);
     renderList(); saveUI();
+  });
+  $("#list").addEventListener("keydown", (e) => {
+    const cp = e.target.closest(".cp");
+    if (cp && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); e.stopPropagation(); copyText(cp.dataset.copy, cp); }
   });
   $("#logout").addEventListener("click", () => { store.del(KEY); ui.del(); location.reload(); });
 
