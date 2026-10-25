@@ -316,6 +316,8 @@
       DATA = await unlock(pw);
       store.set(KEY, pw);
       DATA.works ||= {}; DATA.dubs ||= {};
+      // καρτέλες από το κανάλι με τις περισσότερες σειρές προς τις λιγότερες (σταθερή ταξινόμηση στις ισοπαλίες)
+      DATA.channels.sort((a, b) => b.series.length - a.series.length);
       indexWorks();
       current = DATA.channels[0];
       const y = restoreUI();
