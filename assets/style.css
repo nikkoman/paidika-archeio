@@ -5,6 +5,7 @@
   --muted: #6c6879;
   --line: #e4dfd3;
   --found: #2eaa5c;
+  --found-note: #8fd3a5;
   --partial: #f0a520;
   --missing: #e0605e;
   --missing-soft: #f7d6d5;
@@ -143,12 +144,26 @@ button.ghost { background: transparent; color: var(--muted); border: 1px solid v
 }
 .ep.f { background: var(--found); color: #fff; }
 .ep.p { background: var(--partial); color: #fff; cursor: pointer; }
+.ep.f.has-note { background: var(--found-note); color: #14361f; }
+.ep[data-n] { cursor: pointer; }
+.ep.f.has-note::after { background: #14361f; }
 .ep.has-note::after {
   content: ""; position: absolute; top: 4px; right: 4px; width: 5px; height: 5px; border-radius: 50%; background: #fff;
 }
 .notes { margin: 6px 0 0; padding: 0; list-style: none; font-size: 13.5px; }
 .notes li { padding: 5px 0; border-bottom: 1px solid var(--line); }
 .notes li b { color: var(--partial); margin-right: 6px; }
+.notes li.f b { color: var(--found); }
+.notes li i { color: var(--muted); font-size: 12px; font-style: normal; }
+.notes li.hl { background: var(--bg); border-radius: 6px; padding-left: 6px; }
+.notes-btn {
+  margin: 12px 0 0; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+  background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px;
+}
+.notes-btn[aria-expanded="true"] { background: var(--found-note); color: #14361f; border-color: transparent; }
+.eplist.only-notes .epl:not(.has-note) { display: none; }
+.epl.f.has-note .st b { background: var(--found-note); color: #14361f; }
+.epl.f .et small { color: #2a8a4a; }
 .meta { font-size: 13px; color: var(--muted); margin: 10px 0 0; }
 .meta a { color: var(--ch); font-weight: 600; }
 .no-total { font-size: 13.5px; color: var(--muted); margin: 12px 0; }
