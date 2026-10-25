@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<title>Παιδικό Αρχείο</title>
+<title>Αρχείο Παιδικών Μεταγλωττίσεων</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@500;700&family=Commissioner:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -16,7 +16,7 @@
 <section id="lock" class="lock">
   <div class="lock-card">
     <div class="tape" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
-    <h1>Παιδικό Αρχείο</h1>
+    <h1>Αρχείο Παιδικών Μεταγλωττίσεων</h1>
     <p class="lock-sub">Μεταγλωττισμένες παιδικές σειρές της ελληνικής τηλεόρασης · έως το 2003</p>
     <form id="lock-form" autocomplete="off">
       <label for="pw" class="sr">Κωδικός</label>
@@ -32,7 +32,7 @@
     <div class="tape" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
     <div class="top-row">
       <div>
-        <h1>Παιδικό Αρχείο</h1>
+        <h1>Αρχείο Παιδικών Μεταγλωττίσεων</h1>
         <p class="updated" id="updated"></p>
       </div>
       <button class="ghost" id="logout" type="button">Έξοδος</button>
@@ -44,7 +44,17 @@
 
   <section class="controls">
     <input id="search" type="search" placeholder="Αναζήτηση σειράς…" aria-label="Αναζήτηση">
-    <div class="chips" id="chips" role="group" aria-label="Φίλτρο"></div>
+    <select id="sort" aria-label="Ταξινόμηση">
+      <option value="title">Αλφαβητικά</option>
+      <option value="prod-asc">Έτος παραγωγής ↑</option>
+      <option value="prod-desc">Έτος παραγωγής ↓</option>
+      <option value="air-asc">1η προβολή ↑</option>
+      <option value="air-desc">1η προβολή ↓</option>
+    </select>
+  </section>
+  <section class="controls filters">
+    <div class="chips" id="kinds" role="group" aria-label="Είδος"></div>
+    <div class="chips" id="chips" role="group" aria-label="Κατάσταση"></div>
   </section>
 
   <ul class="list" id="list"></ul>

@@ -12,6 +12,9 @@
   python3 tools/archive.py mark ant1 mr-bogus 7 partial "λείπουν 2 λεπτά στο τέλος"
   python3 tools/archive.py total ant1 nintama-rantaro 42   # ορισμός συνόλου επεισοδίων
   python3 tools/archive.py find bogus                      # αναζήτηση σειράς (κανάλι + id)
+  python3 tools/archive.py eplist ant1 mr-bogus eps.json   # λίστα επεισοδίων: [{"s":1,"e":1,"t":"Τίτλος"}, ...]
+                                                           # (για anime χωρίς κύκλους: "s": null, "e" = απόλυτος αριθμός)
+  python3 tools/archive.py image ant1 mr-bogus https://...  # εικόνα σειράς (URL) ή "none"
 """
 import base64, datetime, getpass, json, os, sys
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
@@ -107,6 +110,21 @@ def main():
     elif cmd == "total":
         obj = load(pw)
         get_series(obj, args[0], args[1])["total"] = int(args[2]) if args[2] != "none" else None
+        save(obj, pw)
+    elif cmd == "eplist":
+        obj = load(pw)
+        s = get_series(obj, args[0], args[1])
+        eps = json.load(open(args[2], encoding="utf-8"))
+        s["eplist"] = eps
+        s["total"] = len(eps)
+        save(obj, pw)
+    elif cmd == "image":
+        obj = load(pw)
+        s = get_series(obj, args[0], args[1])
+        if args[2] == "none":
+            s.pop("img", None)
+        else:
+            s["img"] = args[2]
         save(obj, pw)
     else:
         sys.exit(__doc__)

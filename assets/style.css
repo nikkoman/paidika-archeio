@@ -139,3 +139,33 @@ button.ghost { background: transparent; color: var(--muted); border: 1px solid v
   .summary .stats { grid-template-columns: repeat(2, 1fr); min-width: 0; }
   .summary > div { min-width: 0 !important; }
 }
+
+/* logos */
+.logo { display: inline-grid; place-items: center; background: #14131c; border-radius: 6px; padding: 3px 7px; height: 26px; }
+.logo img { max-height: 18px; max-width: 70px; display: block; }
+.logo.big { height: 34px; padding: 5px 9px; margin-right: 10px; vertical-align: middle; }
+.logo.big img { max-height: 24px; max-width: 90px; }
+.tab { padding: 5px 12px 5px 6px; }
+.tab[aria-selected="true"] { box-shadow: 0 0 0 2px var(--c); }
+.summary h2 { display: flex; align-items: center; }
+
+select#sort {
+  font: inherit; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line);
+  background: var(--card); color: var(--ink);
+}
+.filters { justify-content: space-between; margin-top: -2px; }
+
+/* avatar */
+.ava { position: relative; width: 34px; height: 34px; }
+.ava img { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; display: block; }
+.ava .pie { position: absolute; right: -4px; bottom: -4px; background: var(--card); border-radius: 50%; }
+
+/* episode list */
+.eplist { list-style: none; margin: 12px 0; padding: 0; max-height: 420px; overflow: auto; border: 1px solid var(--line); border-radius: 10px; }
+.epl { display: grid; grid-template-columns: 82px 1fr auto; gap: 10px; align-items: baseline; padding: 7px 12px; border-bottom: 1px solid var(--line); font-size: 13.5px; }
+.epl:last-child { border-bottom: 0; }
+.epl .code { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--muted); font-size: 12.5px; }
+.epl .et small { display: block; color: var(--partial); font-size: 12px; }
+.epl .st { font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: var(--missing-soft); color: var(--missing); }
+.epl.f .st { background: var(--found); color: #fff; }
+.epl.p .st { background: var(--partial); color: #fff; }

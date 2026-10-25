@@ -1,4 +1,4 @@
-# Παιδικό Αρχείο
+# Αρχείο Παιδικών Μεταγλωττίσεων
 
 Αρχείο με τις μεταγλωττισμένες παιδικές σειρές της ελληνικής τηλεόρασης (ANT1, MEGA, STAR, ΣΚΑΪ, ΕΡΤ, ALTER) έως το 2003,
 και με το ποια επεισόδια έχουν βρεθεί σε εγγραφές και ψηφιοποιήσεις.
@@ -16,6 +16,8 @@ python3 tools/archive.py mark ant1 mr-bogus 1-12 found      # βρέθηκαν �
 python3 tools/archive.py mark ant1 mr-bogus 7 partial "λείπουν 2 λεπτά στο τέλος"
 python3 tools/archive.py mark ant1 mr-bogus 13 missing      # αφαίρεση σήμανσης
 python3 tools/archive.py total ant1 nintama-rantaro 42      # ορισμός συνόλου επεισοδίων
+python3 tools/archive.py eplist ant1 mr-bogus eps.json      # λίστα επεισοδίων (θέτει και το σύνολο)
+python3 tools/archive.py image ant1 mr-bogus https://...    # εικόνα σειράς
 git commit -am "Ενημέρωση: Mr. Bogus" && git push
 ```
 
@@ -24,7 +26,8 @@ git commit -am "Ενημέρωση: Mr. Bogus" && git push
 
 ### Μορφή δεδομένων
 
-`channels[] → series[]` με `id, title, kind, years, aired, total, notes, gddb, channel (μόνο ΕΡΤ), episodes`.
+`channels[] → series[]` με `id, title, kind, years, aired, total, notes, gddb, channel (μόνο ΕΡΤ), img, eplist, episodes`.
+Το `eplist` είναι `[{"s": 1, "e": 1, "t": "Τίτλος"}]` (εμφανίζεται ως S01E001)· για anime χωρίς κύκλους `"s": null` και απόλυτη αρίθμηση. Τα κλειδιά του `episodes` είναι η θέση στη λίστα (1, 2, 3…).
 Το `episodes` είναι αντικείμενο `{"7": {"s": "p", "n": "σημείωση"}}`, όπου `s` = `f` (βρέθηκε) ή `p` (βρέθηκε με ελλείψεις).
 Τα επεισόδια που λείπουν απλώς δεν αναφέρονται. Τίτλοι που ξεκινούν με «The» γράφονται «Tick, The».
 
