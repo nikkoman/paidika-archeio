@@ -21,15 +21,17 @@ const b64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
 async function verify(req, body, env) {
   const sig = req.headers.get("x-signature-ed25519"), ts = req.headers.get("x-signature-timestamp");
   if (!sig || !ts) return false;
-  const key = await crypto.subtle.importKey("raw", hex(env.DISCORD_PUBLIC_KEY), { name: "Ed25519" }, false, ["verify"]);
+  const key = await crypto.subtle.importKey("raw", hex(String(env.DISCORD_PUBLIC_KEY).trim()), { name: "Ed25519" }, false, ["verify"]);
   return crypto.subtle.verify("Ed25519", key, hex(sig), new TextEncoder().encode(ts + body));
 }
 
 let cache = { at: 0, rows: null };
 async function index(env) {
   if (cache.rows && Date.now() - cache.at < 60_000) return cache.rows;
-  const env_ = await (await fetch(INDEX_URL + "?t=" + Date.now(), { cf: { cacheTtl: 0 } })).json();
-  const key = await crypto.subtle.importKey("raw", b64(env.INDEX_KEY), "AES-GCM", false, ["decrypt"]);
+  const res = await fetch(INDEX_URL + "?t=" + Date.now());
+  if (!res.ok) throw new Error("ευρετήριο HTTP " + res.status);
+  const env_ = await res.json();
+  const key = await crypto.subtle.importKey("raw", b64(String(env.INDEX_KEY).trim()), "AES-GCM", false, ["decrypt"]);
   const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv: b64(env_.iv) }, key, b64(env_.ct));
   cache = { at: Date.now(), rows: JSON.parse(new TextDecoder().decode(pt)) };
   return cache.rows;
@@ -70,7 +72,9 @@ async function handle(it, env) {
   // Αυτόματη συμπλήρωση ονόματος σειράς
   if (it.type === 4) {
     const q = norm(String((it.data.options || []).find((o) => o.focused)?.value || ""));
-    const rows = await index(env);
+    let rows;
+    try { rows = await index(env); }
+    catch (e) { return json({ type: 8, data: { choices: [{ name: ("Σφάλμα: " + e.message).slice(0, 100), value: "error" }] } }); }
     const hits = rows.filter((r) => !q || norm(r.t).includes(q)).slice(0, 25);
     return json({ type: 8, data: { choices: hits.map((r) => ({
       name: `${r.t} · ${r.cn} (${r.f + r.p}/${r.n || "?"})`.slice(0, 100), value: `${r.c}:${r.i}` })) } });
@@ -113,7 +117,23 @@ async function handle(it, env) {
 
 export default {
   async fetch(req, env) {
-    if (req.method !== "POST") return new Response("Αρχείο Παιδικών Μεταγλωττίσεων — Discord bot", { status: 200 });
+    if (req.method !== "POST") {
+      if (new URL(req.url).pathname === "/check") {
+        const out = [];
+        out.push("DISCORD_PUBLIC_KEY: " + (env.DISCORD_PUBLIC_KEY ? "ok (" + env.DISCORD_PUBLIC_KEY.length + " χαρακτήρες)" : "ΛΕΙΠΕΙ"));
+        out.push("GITHUB_TOKEN: " + (env.GITHUB_TOKEN ? "ok" : "ΛΕΙΠΕΙ"));
+        out.push("INDEX_KEY: " + (env.INDEX_KEY ? "ok (" + env.INDEX_KEY.trim().length + " χαρακτήρες)" : "ΛΕΙΠΕΙ"));
+        try {
+          const r = await fetch(INDEX_URL + "?t=" + Date.now());
+          out.push("Ευρετήριο: HTTP " + r.status);
+          cache.at = 0;
+          const rows = await index(env);
+          out.push("Αποκρυπτογράφηση: ok, " + rows.length + " σειρές");
+        } catch (e) { out.push("Σφάλμα: " + e.name + " " + e.message); }
+        return new Response(out.join("\n"), { headers: { "content-type": "text/plain; charset=utf-8" } });
+      }
+      return new Response("Αρχείο Παιδικών Μεταγλωττίσεων — Discord bot", { status: 200, headers: { "content-type": "text/plain; charset=utf-8" } });
+    }
     const body = await req.text();
     if (!(await verify(req, body, env))) return new Response("invalid signature", { status: 401 });
     const it = JSON.parse(body);
