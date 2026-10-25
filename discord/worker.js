@@ -82,7 +82,10 @@ const SYSTEM = `Είσαι ο βοηθός ενός ελληνικού Discord s
 Κανόνες:
 - Καλείς ΠΑΝΤΑ το εργαλείο respond.
 - kind="update" μόνο όταν είσαι σίγουρος για τη σειρά ΚΑΙ για τα επεισόδια. Αν η σειρά ταιριάζει σε περισσότερα κανάλια και δεν διευκρινίζεται, kind="clarify" και ρώτα ποιο κανάλι, αναφέροντας τις επιλογές.
-- state: "found" (βρέθηκε), "partial" (βρέθηκε με ελλείψεις — πάντα με σύντομη σημείωση στα ελληνικά), "missing" (αναίρεση/λείπει).
+- state: "found" (βρέθηκε), "partial" (βρέθηκε με ελλείψεις — πάντα με σύντομη σημείωση στα ελληνικά), "missing" (αναίρεση/λείπει),
+  "note" (μόνο σημείωση σε επεισόδιο που έχει ήδη βρεθεί, χωρίς αλλαγή κατάστασης — π.χ. ποιότητα, από ποια κασέτα, παρατηρήσεις· προστίθεται στην υπάρχουσα σημείωση· κενή note = διαγραφή σημείωσης).
+- Αν η σημείωση λέει ότι κάτι λείπει ή κόβεται (π.χ. «λείπουν 4 δευτερόλεπτα από τον διάλογο…»), χρησιμοποίησε "partial". Για άλλες παρατηρήσεις χωρίς ελλείψεις, "note".
+- Η note να είναι σύντομη (έως 200 χαρακτήρες) και να κρατά τις λεπτομέρειες του χρήστη (ονόματα χαρακτήρων, χρόνους, σημεία).
 - range: π.χ. "1-12", "3,5,8". «όλα/ολόκληρο» = 1-σύνολο. Μην ξεπερνάς το σύνολο.
 - Αν κάποια επεισόδια ενός εύρους έχουν ελλείψεις, βάλε το εύρος ως found ΚΑΙ ξεχωριστά τα επεισόδια με ελλείψεις ως partial (υπερισχύουν).
 - kind="answer" για ερωτήσεις (π.χ. πόσα έχουμε) — απάντησε σύντομα από τον κατάλογο.
@@ -98,7 +101,7 @@ const TOOL = {
       kind: { type: "string", enum: ["update", "answer", "clarify"] },
       series_key: { type: "string", description: "κλειδί σειράς από τον κατάλογο (μόνο για update)" },
       ops: { type: "array", items: { type: "object", properties: {
-        range: { type: "string" }, state: { type: "string", enum: ["found", "partial", "missing"] },
+        range: { type: "string" }, state: { type: "string", enum: ["found", "partial", "missing", "note"] },
         note: { type: "string" } }, required: ["range", "state"] } },
       message: { type: "string", description: "κείμενο προς τον χρήστη, στα ελληνικά" },
     },
@@ -132,7 +135,7 @@ async function followup(it, data) {
   });
 }
 
-const STATE_LABEL = { found: "✅ βρέθηκαν", partial: "🟧 με ελλείψεις", missing: "↩️ λείπουν" };
+const STATE_LABEL = { found: "✅ βρέθηκαν", partial: "🟧 με ελλείψεις", missing: "↩️ λείπουν", note: "📝 σημείωση" };
 
 async function handleSay(it, env) {
   const text = String(opt(it, "κείμενο") || "").slice(0, 500);
@@ -147,10 +150,10 @@ async function handleSay(it, env) {
     if (!row || !Array.isArray(a.ops) || !a.ops.length) return followup(it, { content: head + "Δεν κατάλαβα ποια σειρά ή ποια επεισόδια εννοείς — μπορείς να το γράψεις αλλιώς;" });
     const ops = [];
     for (const op of a.ops) {
-      try { ops.push({ range: parseRange(op.range, row.n), state: op.state, note: op.state === "partial" ? String(op.note || "").slice(0, 200) : "" }); }
+      try { ops.push({ range: parseRange(op.range, row.n), state: op.state, note: op.state === "partial" || op.state === "note" ? String(op.note || "").slice(0, 200) : "" }); }
       catch (e) { return followup(it, { content: head + "⚠️ " + e.message }); }
     }
-    const lines = ops.map((o) => `${STATE_LABEL[o.state]}: επεισόδια **${o.range}**${o.note ? ` — «${o.note}»` : ""}`).join("\n");
+    const lines = ops.map((o) => `${STATE_LABEL[o.state]}: επεισόδια **${o.range}**${o.note ? ` — «${o.note}»` : o.state === "note" ? " — (διαγραφή σημείωσης)" : ""}`).join("\n");
     const payload = b64u(JSON.stringify({ k: `${row.c}:${row.i}`, o: ops, u: user.id }));
     return followup(it, {
       content: head,
@@ -183,7 +186,7 @@ async function handleButton(it, env) {
   await dispatch(env, { cmd: "batch", channel: c, id, ops: JSON.stringify(p.o), by: user.global_name || user.username || "Discord",
     title: row.t, range: p.o.map((o) => o.range).join(" "), state: "" });
   cache.at = 0;
-  const lines = p.o.map((o) => `${STATE_LABEL[o.state]}: επεισόδια **${o.range}**${o.note ? ` — «${o.note}»` : ""}`).join("\n");
+  const lines = p.o.map((o) => `${STATE_LABEL[o.state]}: επεισόδια **${o.range}**${o.note ? ` — «${o.note}»` : o.state === "note" ? " — (διαγραφή σημείωσης)" : ""}`).join("\n");
   return json({ type: 7, data: { embeds: [{ ...emb, description: `${lines}\n\n✅ **Καταχωρήθηκε.** Το site ενημερώνεται σε 1–2 λεπτά.` }], components: [] } });
 }
 
