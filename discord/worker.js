@@ -105,6 +105,7 @@ const unb64u = (s) => decodeURIComponent(escape(atob(s.replace(/-/g, "+").replac
 const SYSTEM = `Είσαι ο βοηθός ενός ελληνικού Discord server που αρχειοθετεί ψηφιοποιήσεις (από VHS) μεταγλωττισμένων παιδικών σειρών της ελληνικής τηλεόρασης.
 Τα μέλη γράφουν σε απλή, καθημερινή γλώσσα (συχνά με greeklish ή ορθογραφικά λάθη) τι βρήκαν ή ρωτούν για την πρόοδο.
 Ο κατάλογος σειρών είναι στη μορφή: κλειδί|τίτλος / ελληνικός τίτλος|κανάλια|σύνολο=Ν|βρέθηκαν=Ν|ελλείψεις=Ν|άγνωστα=Ν.
+Όσα από τα βρέθηκαν/ελλείψεις/άγνωστα είναι 0 παραλείπονται (π.χ. χωρίς «βρέθηκαν=» σημαίνει ότι δεν έχει βρεθεί κανένα).
 «άγνωστα» = επεισόδια που κάποιος είπε ότι έχουμε, χωρίς να πει ποια. Πόσα έχουμε = βρέθηκαν + ελλείψεις + άγνωστα.
 ΠΡΟΣΟΧΗ: το «σύνολο» είναι πόσα επεισόδια έχει η σειρά, ΟΧΙ πόσα έχουμε. Πόσα έχουμε = βρέθηκαν + ελλείψεις. Μην τα μπερδεύεις.
 Κάθε γραμμή είναι μία μεταγλώττιση· όταν γράφει πολλά κανάλια (π.χ. «ΕΡΤ, MEGA»), είναι η ίδια μεταγλώττιση με κοινή πρόοδο, άρα ΜΗΝ ρωτάς για κανάλι.
@@ -171,9 +172,13 @@ const HISTORY_TOOL = {
   input_schema: { type: "object", properties: { series_key: { type: "string" } }, required: ["series_key"] },
 };
 
+// Στο Claude κάθε σειρά έχει σύντομο κλειδί («s» + θέση στο ευρετήριο) αντί για «κανάλι:id», για λιγότερα tokens
+const keyOf = (rows, r) => "s" + rows.indexOf(r);
+const rowOf = (rows, key) => /^s\d+$/.test(key) ? rows[+key.slice(1)] : rows.find((r) => `${r.c}:${r.i}` === key);
+
 const STATE_WORD = { f: "βρέθηκαν", p: "με ελλείψεις" };
 async function historyOf(env, rows, key) {
-  const row = rows.find((r) => `${r.c}:${r.i}` === key);
+  const row = rowOf(rows, key);
   if (!row) return "Άγνωστο κλειδί σειράς.";
   const all = (row.d && (await who(env))[row.d]) || [];
   const list = all.filter((x) => x[2]);
@@ -192,7 +197,7 @@ async function historyOf(env, rows, key) {
 }
 
 async function episodeList(env, rows, key) {
-  const row = rows.find((r) => `${r.c}:${r.i}` === key);
+  const row = rowOf(rows, key);
   if (!row) return "Άγνωστο κλειδί σειράς.";
   const list = row.w ? (await titles(env))[row.w] : null;
   if (!list) return "Δεν υπάρχουν τίτλοι επεισοδίων για αυτή τη σειρά.";
@@ -240,8 +245,10 @@ function candidates(rows, text) {
 
 async function askClaude(env, rows, text) {
   const seen = new Set(), pick = candidates(rows, text), partial = pick.length < rows.length;
+  // μηδενικά πεδία και ελληνικός τίτλος ίδιος με τον αγγλικό παραλείπονται (λιγότερα tokens όταν στέλνεται όλος ο κατάλογος)
   const catalog = pick.filter((r) => !r.d || !seen.has(r.d) && seen.add(r.d))
-    .map((r) => `${r.c}:${r.i}|${r.t}${r.g ? " / " + r.g : ""}|${channelsOf(rows, r)}|σύνολο=${r.n || "?"}|βρέθηκαν=${r.f}|ελλείψεις=${r.p}|άγνωστα=${r.u || 0}`).join("\n");
+    .map((r) => `${keyOf(rows, r)}|${r.t}${r.g && r.g !== r.t ? " / " + r.g : ""}|${channelsOf(rows, r)}|σύνολο=${r.n || "?"}`
+      + (r.f ? `|βρέθηκαν=${r.f}` : "") + (r.p ? `|ελλείψεις=${r.p}` : "") + (r.u ? `|άγνωστα=${r.u}` : "")).join("\n");
   const messages = [{ role: "user", content: text }];
   for (let round = 0; round < 4; round++) {
     const last = round === 3;
@@ -250,7 +257,8 @@ async function askClaude(env, rows, text) {
       headers: { "x-api-key": env.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json" },
       body: JSON.stringify({
         model: env.MODEL || MODEL, max_tokens: 700,
-        system: [{ type: "text", text: SYSTEM }, { type: "text", text: (partial ? "Κατάλογος (μόνο οι σειρές που μοιάζουν με το μήνυμα· αν η σειρά του χρήστη δεν είναι εδώ, kind=\"clarify\" και ζήτα τον τίτλο όπως γράφεται στο site):\n" : "Κατάλογος:\n") + catalog, cache_control: { type: "ephemeral" } }],
+        // 2 σημεία cache: οι σταθερές οδηγίες (κοινές για όλα τα /πες, φτηνές για 5') και ο κατάλογος (για τους επόμενους γύρους)
+        system: [{ type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } }, { type: "text", text: (partial ? "Κατάλογος (μόνο οι σειρές που μοιάζουν με το μήνυμα· αν η σειρά του χρήστη δεν είναι εδώ, kind=\"clarify\" και ζήτα τον τίτλο όπως γράφεται στο site):\n" : "Κατάλογος:\n") + catalog, cache_control: { type: "ephemeral" } }],
         tools: [EPISODES_TOOL, HISTORY_TOOL, TOOL], tool_choice: last ? { type: "tool", name: "respond" } : { type: "any" },
         messages,
       }),
@@ -259,7 +267,7 @@ async function askClaude(env, rows, text) {
     const out = await r.json();
     const uses = (out.content || []).filter((c) => c.type === "tool_use");
     const done = uses.find((u) => u.name === "respond");
-    if (done) return done.input;
+    if (done) { const row = rowOf(rows, done.input.series_key); return { ...done.input, series_key: row ? `${row.c}:${row.i}` : done.input.series_key }; }
     if (!uses.length) break;
     messages.push({ role: "assistant", content: out.content });
     messages.push({ role: "user", content: await Promise.all(uses.map(async (u) => ({
