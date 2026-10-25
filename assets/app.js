@@ -137,8 +137,8 @@
       const meta = [s.kind === "Μικτό" ? "Κινούμενα σχέδια & ζωντανής δράσης" : s.kind, s.years, s.aired ? "1η προβολή " + s.aired : "", s.channel].filter(Boolean).join(" · ");
       return `<li class="item${isOpen ? " open" : ""}">
         <button class="row" data-id="${esc(s.id)}" aria-expanded="${isOpen}">
-          ${s.img ? `<span class="ava"><img src="${esc(s.img)}" alt="" loading="lazy">${pie(x.f, x.p, x.t, 16, 4)}</span>` : pie(x.f, x.p, x.t, 30, 7)}
-          <span><span class="t">${esc(s.title)}</span><br><span class="m">${esc(meta)}</span></span>
+          ${pie(x.f, x.p, x.t, 30, 7)}
+          <span class="ttl">${s.img ? `<img class="ava" src="${esc(s.img)}" alt="" loading="lazy">` : ""}<span><span class="t">${esc(s.title)}</span><br><span class="m">${esc(meta)}</span></span></span>
           <span class="count">${x.t ? `<b>${x.f + x.p}</b> / ${x.t}` : "—"}${(BYWORK[s.work] || []).length > 1 ? `<span class="multi" title="Προβλήθηκε και σε άλλο κανάλι">⇄</span>` : ""}<span class="chev">›</span></span>
         </button>
         ${isOpen ? detail(s) : ""}
