@@ -220,7 +220,7 @@
         const e = E[String(i + 1)], st = e ? e.s : "m";
         const code = ep.s != null ? `S${pad(ep.s, 2)}E${pad(ep.e, 3)}` : pad(ep.e, 3);
         const lab = st === "f" ? "βρέθηκε" : st === "p" ? "με ελλείψεις" : "λείπει";
-        return `<li class="epl ${st}${e && e.n ? " has-note" : ""}"><span class="code">${code}</span><span class="et">${esc(ep.t || "")}${copyBtn(`${s.title} ${code}${ep.t ? " " + ep.t : ""}`, "Αντιγραφή (σειρά, επεισόδιο, τίτλος)")}${e && e.n ? `<small>📝 ${esc(e.n)}</small>` : ""}</span><span class="st">${badges(i + 1)}<b>${lab}</b></span></li>`;
+        return `<li class="epl ${st}${e && e.n ? " has-note" : ""}${e && e.src ? " has-src" : ""}"><span class="code">${code}</span><span class="et">${esc(ep.t || "")}${copyBtn(`${s.title} ${code}${ep.t ? " " + ep.t : ""}`, "Αντιγραφή (σειρά, επεισόδιο, τίτλος)")}${e && e.n ? `<small>📝 ${esc(e.n)}</small>` : ""}${e && e.src ? `<small class="src">📼 ${esc(e.src)}</small>` : ""}</span><span class="st">${badges(i + 1)}<b>${lab}</b></span></li>`;
       }).join("");
       grid = `<ol class="eplist">${rows}</ol>`;
     } else if (t) {
@@ -228,17 +228,17 @@
       for (let i = 1; i <= t; i++) {
         const e = E[String(i)], cls = e ? e.s : "";
         const other = badgeDubs.some((o) => epsOf(o.s)[String(i)]);
-        const tip = `Επεισόδιο ${i}: ${e ? (e.s === "f" ? "βρέθηκε" : "βρέθηκε με ελλείψεις") : "λείπει"}${e && e.n ? " — " + e.n : ""}${e && e.b ? ` (${e.b}, ${e.d})` : ""}`;
-        cells.push(`<span class="ep ${cls}${e && e.n ? " has-note" : ""}${other ? " other" : ""}" title="${esc(tip)}"${e && e.n ? ` data-n="${i}" role="button" tabindex="0"` : ""}>${i}</span>`);
+        const tip = `Επεισόδιο ${i}: ${e ? (e.s === "f" ? "βρέθηκε" : "βρέθηκε με ελλείψεις") : "λείπει"}${e && e.n ? " — " + e.n : ""}${e && e.src ? " — Πηγές: " + e.src : ""}${e && e.b ? ` (${e.b}, ${e.d})` : ""}`;
+        cells.push(`<span class="ep ${cls}${e && e.n ? " has-note" : ""}${other ? " other" : ""}" title="${esc(tip)}"${e && (e.n || e.src) ? ` data-n="${i}" role="button" tabindex="0"` : ""}>${i}</span>`);
       }
       grid = `<div class="eps">${cells.join("")}</div>`;
     } else {
       grid = `<p class="no-total">Δεν έχει οριστεί ακόμα ο αριθμός επεισοδίων για αυτή τη σειρά.</p>`;
     }
     const notes = (L && L.length) ? "" : Object.keys(E).map(Number).sort((a, b) => a - b)
-      .filter((n) => E[n].n).map((n) => `<li class="${E[n].s}" data-n="${n}"><b>Επ. ${n}</b>${esc(E[n].n)}${E[n].nb || E[n].b ? ` <i>(${esc(E[n].nb || E[n].b)}${E[n].nd || E[n].d ? ", " + esc(E[n].nd || E[n].d) : ""})</i>` : ""}</li>`).join("");
+      .filter((n) => E[n].n || E[n].src).map((n) => `<li class="${E[n].s}" data-n="${n}"><b>Επ. ${n}</b>${E[n].n ? esc(E[n].n) : ""}${E[n].n && (E[n].nb || E[n].b) ? ` <i>(${esc(E[n].nb || E[n].b)}${E[n].nd || E[n].d ? ", " + esc(E[n].nd || E[n].d) : ""})</i>` : ""}${E[n].src ? `<small class="src">📼 ${esc(E[n].src)}</small>` : ""}</li>`).join("");
     // κουμπί σημειώσεων: στη λίστα με τίτλους φιλτράρει, στα κουτάκια ανοίγει τη λίστα σημειώσεων
-    const nNotes = Object.values(E).filter((e) => e.n).length;
+    const nNotes = Object.values(E).filter((e) => e.n || e.src).length;
     const notesBtn = nNotes ? `<button class="notes-btn" type="button" aria-expanded="false">📝 Σημειώσεις (${nNotes})</button>` : "";
     const also = others.map((o) => {
       const same = o.s.dub === s.dub, x = stats(o.s);

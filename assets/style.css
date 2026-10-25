@@ -161,7 +161,8 @@ button.ghost { background: transparent; color: var(--muted); border: 1px solid v
   background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px;
 }
 .notes-btn[aria-expanded="true"] { background: var(--found-note); color: #14361f; border-color: transparent; }
-.eplist.only-notes .epl:not(.has-note) { display: none; }
+.eplist.only-notes .epl:not(.has-note):not(.has-src) { display: none; }
+.epl .et small.src, .epl.f .et small.src, .epl.p .et small.src, .notes li small.src { display: block; color: var(--muted); font-size: 12px; }
 .epl.f.has-note .st b { background: var(--found-note); color: #14361f; }
 .epl.f .et small { color: #2a8a4a; }
 .meta { font-size: 13px; color: var(--muted); margin: 10px 0 0; }
