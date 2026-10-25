@@ -62,7 +62,18 @@ button.ghost { background: transparent; color: var(--muted); border: 1px solid v
 
 /* App */
 .app { max-width: 980px; margin: 0 auto; padding: 16px 16px 48px; }
-.top { position: sticky; top: 0; z-index: 5; background: var(--bg); padding: 10px 0 8px; }
+.top { padding: 10px 0 0; }
+/* σταθερή μπάρα: κανάλια + αναζήτηση· η υπόλοιπη σελίδα κυλά από κάτω */
+.bar { position: sticky; top: 0; z-index: 5; background: var(--bg); padding: 4px 0 8px; border-bottom: 1px solid var(--line); }
+.bar .controls { margin: 8px 0 0; flex-wrap: nowrap; }
+.bar #search { min-width: 0; }
+.bar #sort { max-width: 42%; }
+.row { scroll-margin-top: calc(var(--bar-h, 0px) + 8px); }
+/* οθόνη φόρτωσης όταν υπάρχει ήδη κωδικός (χωρίς να φανεί η σελίδα κωδικού) */
+.loading { display: none; }
+.has-pw .loading { display: grid; }
+.has-pw #lock { display: none; }
+.loading .lock-sub { margin: 18px 0 0; }
 .top-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; }
 .top h1 { font-size: 24px; }
 .updated { color: var(--muted); font-size: 13px; margin: 2px 0 0; }
