@@ -91,11 +91,11 @@ def write_index(obj):
         eps = v.get("eplist") or []
         if any(e.get("t") for e in eps):
             titles[w] = [(f"S{e['s']:02d}E{e['e']:02d} " if e.get("s") else "") + (e.get("t") or "") for e in eps]
-    # ποιος σημείωσε τι και πότε, ανά μεταγλώττιση: {dub: [[επ, κατάσταση, όνομα, ημ/νία, σημείωση], ...]}
+    # ποιος σημείωσε τι και πότε, ανά μεταγλώττιση: {dub: [[επ, κατάσταση, όνομα, ημ/νία, σημείωση, discord id], ...]}
     who = {}
     for dub, v in obj.get("dubs", {}).items():
         # όλα τα σημειωμένα επεισόδια (όνομα null = παλιά καταχώριση χωρίς όνομα) — το bot τα χρειάζεται για το failsafe
-        lst = [[int(n), e.get("s"), e.get("b"), e.get("d"), e.get("n", "")] for n, e in v.get("episodes", {}).items()]
+        lst = [[int(n), e.get("s"), e.get("b"), e.get("d"), e.get("n", ""), e.get("u")] for n, e in v.get("episodes", {}).items()]
         if lst:
             who[dub] = sorted(lst)
     for path, data in ((INDEX, rows), (TITLES, titles), (WHO, who)):
@@ -114,7 +114,8 @@ def stamp(by):
         now = datetime.datetime.now(ZoneInfo("Europe/Athens"))
     except Exception:
         now = datetime.datetime.now()
-    return {"b": by[:40], "d": now.strftime("%Y-%m-%d %H:%M")}
+    uid = os.environ.get("BYID", "").strip()  # Discord user id (για tag στο bot)
+    return {"b": by[:40], "d": now.strftime("%Y-%m-%d %H:%M"), **({"u": uid[:24]} if uid.isdigit() else {})}
 
 
 def get_series(obj, ch, sid):
