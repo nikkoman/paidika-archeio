@@ -134,7 +134,7 @@
     $("#empty").hidden = rows.length > 0;
     $("#list").innerHTML = rows.map((s) => {
       const x = stats(s), isOpen = open.has(current.id + "/" + s.id);
-      const meta = [s.kind === "Μικτό" ? "Κινούμενα σχέδια & ζωντανής δράσης" : s.kind, s.years, s.aired ? "1η προβολή " + s.aired : "", s.channel].filter(Boolean).join(" · ");
+      const meta = [s.kind === "Μικτό" ? "Κινούμενα σχέδια & ζωντανής δράσης" : s.kind, s.years, s.aired ? `1η προβολή ${s.airedApprox ? "~" : ""}${s.aired}${s.dubyear && s.dubyear !== s.aired ? ` (μεταγλ. ${s.dubyear})` : ""}` : "", s.channel].filter(Boolean).join(" · ");
       return `<li class="item${isOpen ? " open" : ""}">
         <button class="row" data-id="${esc(s.id)}" aria-expanded="${isOpen}">
           ${pie(x.f, x.p, x.t, 30, 7)}
