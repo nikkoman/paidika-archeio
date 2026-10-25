@@ -15,6 +15,11 @@
   python3 tools/archive.py eplist ant1 mr-bogus eps.json   # λίστα επεισοδίων: [{"s":1,"e":1,"t":"Τίτλος"}, ...]
                                                            # (για anime χωρίς κύκλους: "s": null, "e" = απόλυτος αριθμός)
   python3 tools/archive.py image ant1 mr-bogus https://...  # εικόνα σειράς (URL) ή "none"
+  python3 tools/archive.py samedub ant1 conan-the-adventurer star conan-the-adventurer  # ίδια μεταγλώττιση → κοινή πρόοδος
+  python3 tools/archive.py splitdub star conan-the-adventurer                          # χωρισμός σε δική της μεταγλώττιση
+
+Δομή: κάθε σειρά καναλιού έχει "work" (το έργο, κοινό σε όλα τα κανάλια) και "dub" (τη μεταγλώττιση).
+Η πρόοδος (επεισόδια) αποθηκεύεται ανά μεταγλώττιση στο obj["dubs"], η λίστα επεισοδίων ανά έργο στο obj["works"].
 """
 import base64, datetime, getpass, json, os, sys
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
@@ -96,16 +101,17 @@ def main():
     elif cmd == "mark":
         obj = load(pw)
         s = get_series(obj, args[0], args[1])
+        dub = obj["dubs"].setdefault(s["dub"], {"episodes": {}})
         state = {"found": "f", "partial": "p", "missing": None}[args[3]]
         note = args[4] if len(args) > 4 else None
         for n in parse_range(args[2]):
             if state is None:
-                s["episodes"].pop(str(n), None)
+                dub["episodes"].pop(str(n), None)
             else:
                 e = {"s": state}
                 if note:
                     e["n"] = note
-                s["episodes"][str(n)] = e
+                dub["episodes"][str(n)] = e
         save(obj, pw)
     elif cmd == "total":
         obj = load(pw)
@@ -115,8 +121,29 @@ def main():
         obj = load(pw)
         s = get_series(obj, args[0], args[1])
         eps = json.load(open(args[2], encoding="utf-8"))
-        s["eplist"] = eps
-        s["total"] = len(eps)
+        obj["works"].setdefault(s["work"], {})["eplist"] = eps
+        for c in obj["channels"]:          # ίδιο έργο σε άλλα κανάλια: ευθυγράμμιση συνόλου αν δεν έχει οριστεί
+            for o in c["series"]:
+                if o["work"] == s["work"] and not o.get("total"):
+                    o["total"] = len(eps)
+        if len(args) < 4 or args[3] != "keep-total":
+            s["total"] = len(eps)
+        save(obj, pw)
+    elif cmd == "samedub":   # samedub ant1 conan-the-adventurer star conan-the-adventurer
+        obj = load(pw)
+        a, b = get_series(obj, args[0], args[1]), get_series(obj, args[2], args[3])
+        ea = obj["dubs"].setdefault(a["dub"], {"episodes": {}})["episodes"]
+        eb = obj["dubs"].pop(b["dub"], {"episodes": {}})["episodes"] if b["dub"] != a["dub"] else {}
+        for k, v in eb.items():
+            ea.setdefault(k, v)
+        b["dub"] = a["dub"]
+        save(obj, pw)
+    elif cmd == "splitdub":  # splitdub star conan-the-adventurer
+        obj = load(pw)
+        s = get_series(obj, args[0], args[1])
+        new = f"{s['work']}@{args[0]}"
+        obj["dubs"][new] = {"episodes": dict(obj["dubs"].get(s["dub"], {"episodes": {}})["episodes"])}
+        s["dub"] = new
         save(obj, pw)
     elif cmd == "image":
         obj = load(pw)

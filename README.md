@@ -24,11 +24,20 @@ git commit -am "Ενημέρωση: Mr. Bogus" && git push
 Για μεγαλύτερες αλλαγές: `decrypt` σε αρχείο **εκτός** repository, επεξεργασία του JSON, `encrypt`.
 Μην κάνετε ποτέ commit το αποκρυπτογραφημένο JSON.
 
+Κοινές σειρές σε πολλά κανάλια: κάθε σειρά καναλιού έχει `work` (το έργο) και `dub` (τη μεταγλώττιση).
+Ίδια μεταγλώττιση → κοινή πρόοδος (`samedub`), διαφορετική → χωριστή αλλά συνδεδεμένη (`splitdub`).
+
+```bash
+python3 tools/archive.py samedub ant1 conan-the-adventurer star conan-the-adventurer
+python3 tools/archive.py splitdub star babar
+```
+
 ### Μορφή δεδομένων
 
-`channels[] → series[]` με `id, title, kind, years, aired, total, notes, gddb, channel (μόνο ΕΡΤ), img, eplist, episodes`.
+`channels[] → series[]` με `id, title, kind, years, aired, total, notes, gddb, channel (μόνο ΕΡΤ), img, work, dub`.
+`works{work: {eplist}}` και `dubs{dub: {episodes}}`.
 Το `eplist` είναι `[{"s": 1, "e": 1, "t": "Τίτλος"}]` (εμφανίζεται ως S01E001)· για anime χωρίς κύκλους `"s": null` και απόλυτη αρίθμηση. Τα κλειδιά του `episodes` είναι η θέση στη λίστα (1, 2, 3…).
-Το `episodes` είναι αντικείμενο `{"7": {"s": "p", "n": "σημείωση"}}`, όπου `s` = `f` (βρέθηκε) ή `p` (βρέθηκε με ελλείψεις).
+Το `dubs[...].episodes` είναι αντικείμενο `{"7": {"s": "p", "n": "σημείωση"}}`, όπου `s` = `f` (βρέθηκε) ή `p` (βρέθηκε με ελλείψεις).
 Τα επεισόδια που λείπουν απλώς δεν αναφέρονται. Τίτλοι που ξεκινούν με «The» γράφονται «Tick, The».
 
 Πηγή στοιχείων σειρών: [GreekDubDB](https://www.greekdubdb.com).

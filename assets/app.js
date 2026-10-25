@@ -30,14 +30,22 @@
   }
 
   // ---------- numbers ----------
+  let BYWORK = {};
+  const epsOf = (s) => (DATA.dubs[s.dub] || {}).episodes || {};
+  const listOf = (s) => (DATA.works[s.work] || {}).eplist || null;
+  const totalOf = (s) => s.total || (listOf(s) ? listOf(s).length : 0);
   function stats(s) {
     let f = 0, p = 0;
-    for (const k in s.episodes) {
-      const n = +k;
-      if (s.total && n > s.total) continue;
-      if (s.episodes[k].s === "f") f++; else if (s.episodes[k].s === "p") p++;
+    const E = epsOf(s), t = totalOf(s);
+    for (const k in E) {
+      if (t && +k > t) continue;
+      if (E[k].s === "f") f++; else if (E[k].s === "p") p++;
     }
-    return { f, p, t: s.total || 0 };
+    return { f, p, t };
+  }
+  function indexWorks() {
+    BYWORK = {};
+    for (const ch of DATA.channels) for (const s of ch.series) (BYWORK[s.work] ||= []).push({ ch, s });
   }
   function chStats(ch) {
     let f = 0, p = 0, t = 0, done = 0, any = 0;
@@ -131,39 +139,55 @@
         <button class="row" data-id="${esc(s.id)}" aria-expanded="${isOpen}">
           ${s.img ? `<span class="ava"><img src="${esc(s.img)}" alt="" loading="lazy">${pie(x.f, x.p, x.t, 16, 4)}</span>` : pie(x.f, x.p, x.t, 30, 7)}
           <span><span class="t">${esc(s.title)}</span><br><span class="m">${esc(meta)}</span></span>
-          <span class="count">${x.t ? `<b>${x.f + x.p}</b> / ${x.t}` : "—"}<span class="chev">›</span></span>
+          <span class="count">${x.t ? `<b>${x.f + x.p}</b> / ${x.t}` : "—"}${(BYWORK[s.work] || []).length > 1 ? `<span class="multi" title="Προβλήθηκε και σε άλλο κανάλι">⇄</span>` : ""}<span class="chev">›</span></span>
         </button>
         ${isOpen ? detail(s) : ""}
       </li>`;
     }).join("");
   }
   function detail(s) {
+    const E = epsOf(s), t = totalOf(s), L = listOf(s);
+    const others = (BYWORK[s.work] || []).filter((o) => o.s !== s);
+    const otherDubs = others.filter((o) => o.s.dub !== s.dub);
+    const seenDub = new Set();
+    const badgeDubs = otherDubs.filter((o) => !seenDub.has(o.s.dub) && seenDub.add(o.s.dub));
+    const badges = (i) => badgeDubs.map((o) => {
+      const e = epsOf(o.s)[String(i)];
+      return e ? `<span class="ob ${e.s}" title="${esc(o.ch.name)}: ${e.s === "f" ? "βρέθηκε" : "με ελλείψεις"}${e.n ? " — " + esc(e.n) : ""}"><img src="assets/logos/${o.ch.id}.png" alt="${esc(o.ch.name)}"></span>` : "";
+    }).join("");
     let grid = "";
-    if (s.eplist && s.eplist.length) {
+    if (L && L.length) {
       const pad = (n, w) => String(n).padStart(w, "0");
-      const rows = s.eplist.map((ep, i) => {
-        const e = s.episodes[String(i + 1)], st = e ? e.s : "m";
+      const rows = L.slice(0, t || L.length).map((ep, i) => {
+        const e = E[String(i + 1)], st = e ? e.s : "m";
         const code = ep.s != null ? `S${pad(ep.s, 2)}E${pad(ep.e, 3)}` : pad(ep.e, 3);
         const lab = st === "f" ? "βρέθηκε" : st === "p" ? "με ελλείψεις" : "λείπει";
-        return `<li class="epl ${st}"><span class="code">${code}</span><span class="et">${esc(ep.t || "")}${e && e.n ? `<small>${esc(e.n)}</small>` : ""}</span><span class="st">${lab}</span></li>`;
+        return `<li class="epl ${st}"><span class="code">${code}</span><span class="et">${esc(ep.t || "")}${e && e.n ? `<small>${esc(e.n)}</small>` : ""}</span><span class="st">${badges(i + 1)}<b>${lab}</b></span></li>`;
       }).join("");
       grid = `<ol class="eplist">${rows}</ol>`;
-    } else if (s.total) {
+    } else if (t) {
       const cells = [];
-      for (let i = 1; i <= s.total; i++) {
-        const e = s.episodes[String(i)], cls = e ? e.s : "";
+      for (let i = 1; i <= t; i++) {
+        const e = E[String(i)], cls = e ? e.s : "";
+        const other = badgeDubs.some((o) => epsOf(o.s)[String(i)]);
         const tip = `Επεισόδιο ${i}: ${e ? (e.s === "f" ? "βρέθηκε" : "βρέθηκε με ελλείψεις") : "λείπει"}${e && e.n ? " — " + e.n : ""}`;
-        cells.push(`<span class="ep ${cls}${e && e.n ? " has-note" : ""}" title="${esc(tip)}">${i}</span>`);
+        cells.push(`<span class="ep ${cls}${e && e.n ? " has-note" : ""}${other ? " other" : ""}" title="${esc(tip)}">${i}</span>`);
       }
       grid = `<div class="eps">${cells.join("")}</div>`;
     } else {
       grid = `<p class="no-total">Δεν έχει οριστεί ακόμα ο αριθμός επεισοδίων για αυτή τη σειρά.</p>`;
     }
-    const notes = (s.eplist && s.eplist.length) ? "" : Object.keys(s.episodes).map(Number).sort((a, b) => a - b)
-      .filter((n) => s.episodes[n].n)
-      .map((n) => `<li><b>Επ. ${n}</b>${esc(s.episodes[n].n)}</li>`).join("");
+    const notes = (L && L.length) ? "" : Object.keys(E).map(Number).sort((a, b) => a - b)
+      .filter((n) => E[n].n).map((n) => `<li><b>Επ. ${n}</b>${esc(E[n].n)}</li>`).join("");
+    const also = others.map((o) => {
+      const same = o.s.dub === s.dub, x = stats(o.s);
+      const info = same ? "ίδια μεταγλώττιση · κοινή πρόοδος" : `άλλη μεταγλώττιση${o.s.aired ? " (" + o.s.aired + ")" : ""} · ${x.f + x.p}/${x.t || "—"} βρέθηκαν`;
+      return `<button class="also-item" data-go="${o.ch.id}|${esc(o.s.id)}"><span class="logo"><img src="assets/logos/${o.ch.id}.png" alt="${esc(o.ch.name)}"></span><span>${info}</span>${same ? "" : pie(x.f, x.p, x.t, 18, 5)}</button>`;
+    }).join("");
     return `<div class="detail">
+      ${also ? `<div class="also"><span class="also-h">Προβλήθηκε επίσης:</span>${also}</div>` : ""}
       ${grid}
+      ${badgeDubs.length && !(L && L.length) ? `<p class="meta">Τα επεισόδια με περίγραμμα έχουν βρεθεί από άλλη μεταγλώττιση.</p>` : ""}
       ${notes ? `<ul class="notes">${notes}</ul>` : ""}
       ${s.notes ? `<p class="meta">${esc(s.notes)}</p>` : ""}
       ${s.gddb ? `<p class="meta"><a href="${esc(s.gddb)}" target="_blank" rel="noopener">Σελίδα στο GreekDubDB ↗</a></p>` : ""}
@@ -194,6 +218,16 @@
   $("#sort").addEventListener("change", (e) => { sortBy = e.target.value; renderList(); });
   $("#search").addEventListener("input", (e) => { query = e.target.value; renderList(); });
   $("#list").addEventListener("click", (e) => {
+    const go = e.target.closest("[data-go]");
+    if (go) {
+      const [cid, sid] = go.dataset.go.split("|");
+      current = DATA.channels.find((c) => c.id === cid);
+      query = ""; $("#search").value = ""; filter = "all"; kinds.clear();
+      open.add(cid + "/" + sid); renderAll();
+      const el = [...document.querySelectorAll(".row")].find((r) => r.dataset.id === sid);
+      if (el) el.scrollIntoView({ block: "center" });
+      return;
+    }
     const b = e.target.closest(".row"); if (!b) return;
     const k = current.id + "/" + b.dataset.id;
     open.has(k) ? open.delete(k) : open.add(k);
@@ -206,6 +240,8 @@
     try {
       DATA = await unlock(pw);
       store.set(KEY, pw);
+      DATA.works ||= {}; DATA.dubs ||= {};
+      indexWorks();
       current = DATA.channels[0];
       $("#lock").hidden = true; $("#app").hidden = false;
       renderAll();

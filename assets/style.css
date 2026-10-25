@@ -169,3 +169,22 @@ select#sort {
 .epl .st { font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: var(--missing-soft); color: var(--missing); }
 .epl.f .st { background: var(--found); color: #fff; }
 .epl.p .st { background: var(--partial); color: #fff; }
+
+/* shared series */
+.multi { margin-left: 8px; color: var(--ch); font-weight: 700; }
+.also { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 12px; }
+.also-h { font-size: 12.5px; color: var(--muted); margin-right: 2px; }
+.also-item {
+  display: inline-flex; align-items: center; gap: 8px; background: var(--bg); color: var(--ink);
+  border: 1px solid var(--line); padding: 4px 10px 4px 4px; font-size: 12.5px; font-weight: 500; border-radius: 999px;
+}
+.also-item .logo { height: 22px; padding: 2px 6px; }
+.also-item .logo img { max-height: 15px; }
+.ep.other { outline: 2px solid var(--found); outline-offset: -2px; }
+.epl .st { display: inline-flex; gap: 4px; align-items: center; background: none !important; padding: 0; }
+.epl .st b { font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: var(--missing-soft); color: var(--missing); }
+.epl.f .st b { background: var(--found); color: #fff; }
+.epl.p .st b { background: var(--partial); color: #fff; }
+.ob { display: inline-grid; place-items: center; background: #14131c; border-radius: 4px; height: 18px; padding: 0 4px; border: 2px solid var(--found); }
+.ob.p { border-color: var(--partial); }
+.ob img { max-height: 10px; max-width: 34px; }
