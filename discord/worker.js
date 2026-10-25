@@ -266,6 +266,10 @@ async function guard(it, env, row, ops) {
   const foreign = removing.filter((n) => byEp.has(n) && byEp.get(n) !== me);
   if (foreign.length)
     return `Τα επεισόδια ${foreign.slice(0, 10).join(", ")}${foreign.length > 10 ? "…" : ""} τα είχε περάσει άλλο μέλος. Μπορείς να αναιρέσεις μόνο ό,τι πέρασες εσύ — για τα υπόλοιπα ρώτα έναν διαχειριστή.`;
+  const clearing = ops.filter((o) => o.state === "note" && !o.note).flatMap((o) => expand(o.range));
+  const foreignNotes = clearing.filter((n) => byEp.has(n) && byEp.get(n) !== me);
+  if (foreignNotes.length)
+    return `Η σημείωση στα επεισόδια ${foreignNotes.slice(0, 10).join(", ")} είναι από άλλο μέλος — μόνο ένας διαχειριστής μπορεί να τη σβήσει.`;
   if (ops.some((o) => o.state === "count" && !o.count) && row.cl && row.cl.b !== me)
     return "Το «έχουμε Ν, άγνωστο ποια» το είχε περάσει άλλο μέλος — μόνο εκείνο ή ένας διαχειριστής μπορεί να το σβήσει.";
   return null;
