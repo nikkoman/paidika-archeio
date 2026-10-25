@@ -31,6 +31,7 @@ from cryptography.hazmat.primitives import hashes
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ENC = os.path.join(ROOT, "data", "archive.enc.json")
 INDEX = os.path.join(ROOT, "data", "index.enc.json")
+TITLES = os.path.join(ROOT, "data", "titles.enc.json")
 ITER = 250_000
 
 
@@ -78,10 +79,18 @@ def write_index(obj):
             t = s.get("total") or len(obj.get("works", {}).get(s.get("work"), {}).get("eplist") or [])
             f = sum(1 for n, e in eps.items() if e.get("s") == "f" and (not t or int(n) <= t))
             p = sum(1 for n, e in eps.items() if e.get("s") == "p" and (not t or int(n) <= t))
-            rows.append({"c": c["id"], "cn": c["name"], "i": s["id"], "t": s["title"], "n": t, "f": f, "p": p})
-    iv = os.urandom(12)
-    ct = AESGCM(base64.b64decode(k)).encrypt(iv, json.dumps(rows, ensure_ascii=False, separators=(",", ":")).encode("utf-8"), None)
-    json.dump({"v": 1, "iv": base64.b64encode(iv).decode(), "ct": base64.b64encode(ct).decode()}, open(INDEX, "w", encoding="utf-8"))
+            rows.append({"c": c["id"], "cn": c["name"], "i": s["id"], "t": s["title"], "n": t, "f": f, "p": p,
+                         "d": s.get("dub"), "w": s.get("work")})
+    # τίτλοι επεισοδίων ανά έργο (θέση στη λίστα = αριθμός επεισοδίου), για να βρίσκει το /πες επεισόδια από τον τίτλο
+    titles = {}
+    for w, v in obj.get("works", {}).items():
+        eps = v.get("eplist") or []
+        if any(e.get("t") for e in eps):
+            titles[w] = [(f"S{e['s']:02d}E{e['e']:02d} " if e.get("s") else "") + (e.get("t") or "") for e in eps]
+    for path, data in ((INDEX, rows), (TITLES, titles)):
+        iv = os.urandom(12)
+        ct = AESGCM(base64.b64decode(k)).encrypt(iv, json.dumps(data, ensure_ascii=False, separators=(",", ":")).encode("utf-8"), None)
+        json.dump({"v": 1, "iv": base64.b64encode(iv).decode(), "ct": base64.b64encode(ct).decode()}, open(path, "w", encoding="utf-8"))
     return True
 
 

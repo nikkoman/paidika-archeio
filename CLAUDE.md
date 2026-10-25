@@ -28,7 +28,7 @@
 - `channels[].series[]` → `id, title, kind, years, aired, airedApprox, dubyear, total, notes, gddb, channel(ΕΡΤ), img, work, dub`.
 - `works{work: {eplist}}` (λίστα επεισοδίων ανά έργο) · `dubs{dub: {episodes: {"7": {"s":"f|p","n":"…"}}}}` (πρόοδος ανά μεταγλώττιση).
   Ίδια μεταγλώττιση σε 2 κανάλια = ίδιο `dub` → κοινή πρόοδος. `work` = GreekDubDB title id (`g123`).
-- `data/index.enc.json`: μικρό ευρετήριο για το Discord bot (κλειδί `ARCHIVE_INDEX_KEY`).
+- `data/index.enc.json`: μικρό ευρετήριο για το Discord bot (κλειδί `ARCHIVE_INDEX_KEY`)· `data/titles.enc.json`: τίτλοι επεισοδίων ανά έργο για το /πες (ίδιο κλειδί, γράφεται από το `index`).
 
 ## Εργαλεία
 `tools/archive.py` (χρειάζεται `ARCHIVE_PASSWORD`, και `ARCHIVE_INDEX_KEY` για `index`):
