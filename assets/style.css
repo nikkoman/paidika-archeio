@@ -250,3 +250,24 @@ img.ava { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; flex
   .tab .logo { height: 24px; padding: 2px 5px; }
   .tab .logo img { max-height: 16px; max-width: 54px; }
 }
+
+/* καρτέλα «Όλα» */
+.all-logo { color: #fff; font-size: 12px; letter-spacing: .5px; line-height: 18px; }
+.logo.big .all-logo { font-size: 15px; line-height: 24px; }
+.ttl > .logos { display: inline-flex; flex-wrap: wrap; gap: 3px; flex: none; max-width: 120px; margin-right: 8px; }
+.ttl > .logos .logo { height: 20px; padding: 2px 5px; }
+.ttl > .logos .logo img { max-height: 13px; max-width: 46px; }
+.picks { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 12px; }
+.pick { display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 12.5px; cursor: pointer; background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 999px; padding: 3px 9px 3px 4px; }
+.pick .logo { height: 22px; padding: 2px 6px; }
+.pick .logo img { max-height: 15px; }
+.pick[aria-pressed="true"] { border-color: var(--ch); box-shadow: 0 0 0 2px var(--ch); font-weight: 700; }
+.pick-meta { margin: 6px 0 0; }
+@media (min-width: 561px) { .picks { justify-content: flex-end; } .pick-meta { text-align: right; } }
+.epf button { white-space: nowrap; }
+@media (max-width: 560px) {
+  .epf button { padding: 4px 9px; font-size: 12.5px; }
+  .ttl > .logos { max-width: 52px; }
+  .ttl > .logos .logo { height: 18px; padding: 1px 4px; }
+  .ttl > .logos .logo img { max-height: 12px; max-width: 40px; }
+}

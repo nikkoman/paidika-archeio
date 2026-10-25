@@ -28,7 +28,7 @@
   function restoreUI() {
     let u; try { u = JSON.parse(ui.get() || "null"); } catch { u = null; }
     if (!u) return 0;
-    current = DATA.channels.find((c) => c.id === u.ch) || current;
+    current = chById(u.ch) || current;
     filter = u.filter || "all"; query = u.query || ""; sortBy = u.sortBy || "title"; scope = u.scope || "all";
     (u.kinds || []).forEach((k) => kinds.add(k)); (u.open || []).forEach((k) => open.add(k));
     $("#search").value = query; $("#sort").value = sortBy;
@@ -79,6 +79,41 @@
     BYWORK = {};
     for (const ch of DATA.channels) for (const s of ch.series) (BYWORK[s.work] ||= []).push({ ch, s });
   }
+  // καρτέλα «Όλα»: κάθε σειρά (έργο) μία φορά. Η πρόοδός της είναι η ένωση όλων των μεταγλωττίσεων:
+  // ένα επεισόδιο μετράει «βρέθηκε» αν βρέθηκε σε οποιοδήποτε κανάλι.
+  let ALL = null;
+  const RANK = { f: 2, p: 1 };
+  function buildAll() {
+    const groups = new Map();
+    for (const ch of DATA.channels) for (const s of ch.series) {
+      const k = s.work || ch.id + "/" + s.id;
+      if (!groups.has(k)) groups.set(k, []);
+      groups.get(k).push({ ch, s });
+    }
+    const series = [];
+    for (const [k, g] of groups) {
+      const dub = "*all/" + k, E = {}, seen = new Set();
+      let total = 0, claim = null, aired = null;
+      for (const { s } of g) {
+        total = Math.max(total, totalOf(s));
+        const cl = claimOf(s); if (cl && (!claim || cl.n > claim.n)) claim = cl;
+        if (s.aired && (!aired || s.aired < aired)) aired = s.aired;
+        if (seen.has(s.dub)) continue; seen.add(s.dub);
+        const e = epsOf(s);
+        for (const n in e) if (!E[n] || RANK[e[n].s] > RANK[E[n].s]) E[n] = e[n];
+      }
+      DATA.dubs[dub] = { episodes: E, ...(claim ? { claim } : {}) };
+      const base = g[0].s;
+      series.push({ ...base, id: "w-" + k.replace(/[^\w-]/g, "_"), dub, total, aired, airedApprox: false, dubyear: null, channel: "", notes: "", group: g });
+    }
+    ALL = { id: "all", name: "Όλα τα κανάλια", color: "#6d5bd0", series };
+  }
+  const chById = (id) => (id === "all" ? ALL : DATA.channels.find((c) => c.id === id));
+  // η μεταγλώττιση που δείχνεται πρώτη μέσα σε μια σειρά της καρτέλας «Όλα»: όποια έχει τα περισσότερα
+  const pick = {};
+  const bestOf = (g) => g.reduce((a, b) => { const x = stats(a.s), y = stats(b.s); return y.f + y.p + y.u > x.f + x.p + x.u ? b : a; });
+  const chipLogos = (g) => [...new Map(g.map((o) => [o.ch.id, o.ch])).values()]
+    .map((ch) => `<span class="logo" title="${esc(ch.name)}"><img src="assets/logos/${ch.id}.png" alt="${esc(ch.name)}"></span>`).join("");
   function chStats(ch) {
     let f = 0, p = 0, u = 0, t = 0, done = 0, any = 0;
     for (const s of ch.series) {
@@ -118,10 +153,10 @@
 
   // ---------- render ----------
   function renderTabs() {
-    $("#tabs").innerHTML = DATA.channels.map((ch) => {
+    $("#tabs").innerHTML = [ALL, ...DATA.channels].map((ch) => {
       const x = chStats(ch);
       return `<button class="tab" role="tab" style="--c:${ch.color}" aria-selected="${ch.id === current.id}" data-ch="${ch.id}" aria-label="${esc(ch.name)}">
-        <span class="logo"><img src="assets/logos/${ch.id}.png" alt="${esc(ch.name)}"></span> <small>${pct(x.f + x.p + x.u, x.t)}%</small></button>`;
+        <span class="logo">${ch === ALL ? `<b class="all-logo">ΟΛΑ</b>` : `<img src="assets/logos/${ch.id}.png" alt="${esc(ch.name)}">`}</span> <small>${pct(x.f + x.p + x.u, x.t)}%</small></button>`;
     }).join("");
   }
   function renderSummary() {
@@ -130,9 +165,9 @@
     $("#summary").innerHTML = `
       ${pie(x.f, x.p, x.t, 92, 16, x.u)}
       <div style="flex:1;min-width:240px">
-        <h2><span class="logo big"><img src="assets/logos/${current.id}.png" alt=""></span>${esc(current.name)}</h2>
+        <h2><span class="logo big">${current === ALL ? `<b class="all-logo">ΟΛΑ</b>` : `<img src="assets/logos/${current.id}.png" alt="">`}</span>${esc(current.name)}</h2>
         <div class="stats" style="margin-top:8px">
-          <div class="stat"><b>${x.n}</b><span>σειρές</span></div>
+          <div class="stat"><b>${x.n.toLocaleString("el-GR")}</b><span>σειρές</span></div>
           <div class="stat"><b>${x.t.toLocaleString("el-GR")}</b><span>επεισόδια</span></div>
           <div class="stat"><b>${(x.f + x.p + x.u).toLocaleString("el-GR")}</b><span>βρέθηκαν</span></div>
           <div class="stat"><b>${pct(x.f + x.p + x.u, x.t)}%</b><span>ολοκλήρωση</span></div>
@@ -168,7 +203,7 @@
   }
   const norm = (s) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
   function renderList() {
-    const q = norm(query.trim()), global = q && scope === "all";
+    const q = norm(query.trim()), global = q && scope === "all" && current !== ALL;
     renderScope();
     // με αναζήτηση σε όλα τα κανάλια, η λίστα έχει σειρές από κάθε κανάλι (με το λογότυπό του)
     const pool = global ? DATA.channels.flatMap((ch) => ch.series.map((s) => ({ ch, s }))) : current.series.map((s) => ({ ch: current, s }));
@@ -188,15 +223,16 @@
       return `<li class="item${isOpen ? " open" : ""}">
         <button class="row" data-ch="${ch.id}" data-id="${esc(s.id)}" aria-expanded="${isOpen}">
           ${pie(x.f, x.p, x.t, 30, 7, x.u)}
-          <span class="ttl">${global ? `<span class="logo" title="${esc(ch.name)}"><img src="assets/logos/${ch.id}.png" alt="${esc(ch.name)}"></span>` : ""}${s.img ? `<img class="ava" src="${esc(s.img)}" alt="" loading="lazy">` : ""}<span><span class="t">${esc(s.title)}</span>${copyBtn(s.title, "Αντιγραφή τίτλου")}<br><span class="m">${esc(meta)}</span></span></span>
-          <span class="count">${x.t ? `<b>${x.f + x.p + x.u}</b> / ${x.t}` : "—"}${x.u ? `<span class="unk" title="${x.u} από αυτά: άγνωστο ποια">?</span>` : ""}${(BYWORK[s.work] || []).length > 1 ? `<span class="multi" title="Προβλήθηκε και σε άλλο κανάλι">⇄</span>` : ""}<span class="chev">›</span></span>
+          <span class="ttl">${s.group ? `<span class="logos">${chipLogos(s.group)}</span>` : ""}${global ? `<span class="logo" title="${esc(ch.name)}"><img src="assets/logos/${ch.id}.png" alt="${esc(ch.name)}"></span>` : ""}${s.img ? `<img class="ava" src="${esc(s.img)}" alt="" loading="lazy">` : ""}<span><span class="t">${esc(s.title)}</span>${copyBtn(s.title, "Αντιγραφή τίτλου")}<br><span class="m">${esc(meta)}</span></span></span>
+          <span class="count">${x.t ? `<b>${x.f + x.p + x.u}</b> / ${x.t}` : "—"}${x.u ? `<span class="unk" title="${x.u} από αυτά: άγνωστο ποια">?</span>` : ""}${!s.group && (BYWORK[s.work] || []).length > 1 ? `<span class="multi" title="Προβλήθηκε και σε άλλο κανάλι">⇄</span>` : ""}<span class="chev">›</span></span>
         </button>
-        ${isOpen ? detail(s) : ""}
+        ${isOpen ? (s.group ? groupDetail(s) : detail(s)) : ""}
       </li>`;
     }).join("");
   }
   function renderScope() {
     const b = $("#scope"), all = scope === "all";
+    b.hidden = current === ALL;
     b.setAttribute("aria-pressed", all);
     b.textContent = all ? "Όλα τα κανάλια" : "Μόνο " + current.name;
     $("#search").placeholder = all ? "Αναζήτηση σε όλα τα κανάλια…" : "Αναζήτηση στο " + current.name + "…";
@@ -208,7 +244,21 @@
     return !!m && (m[2].toLowerCase().startsWith("δευτ") || +m[1] < 11);
   };
   const nf = (e) => !e || mostlyLost(e); // «δεν βρέθηκε» για το φίλτρο
-  function detail(s) {
+  // σειρά της καρτέλας «Όλα»: επιλογή καναλιού/μεταγλώττισης και από κάτω η λεπτομέρεια εκείνου του καναλιού
+  function groupDetail(v) {
+    const g = v.group;
+    if (g.length === 1) return detail(g[0].s, true);
+    const cur = g[pick[v.id]] ? pick[v.id] : g.indexOf(bestOf(g));
+    const sel = g[cur];
+    const opts = g.map((o, i) => {
+      const x = stats(o.s), same = g.findIndex((y) => y.s.dub === o.s.dub) !== i;
+      return `<button type="button" class="pick" data-v="${esc(v.id)}" data-i="${i}" aria-pressed="${i === cur}" title="${esc(o.ch.name)}${o.s.channel ? " (" + esc(o.s.channel) + ")" : ""}${same ? " · ίδια μεταγλώττιση" : ""}">
+        <span class="logo"><img src="assets/logos/${o.ch.id}.png" alt="${esc(o.ch.name)}"></span>${pie(x.f, x.p, x.t, 18, 5, x.u)}<small>${x.f + x.p + x.u}/${x.t || "—"}</small></button>`;
+    }).join("");
+    const m = [sel.s.aired ? `1η προβολή ${sel.s.airedApprox ? "~" : ""}${sel.s.aired}` : sel.s.dubyear ? `μεταγλ. ${sel.s.dubyear}` : "", sel.s.channel].filter(Boolean).join(" · ");
+    return `<div class="picks"><span class="also-h">Κανάλι:</span>${opts}</div>${m ? `<p class="meta pick-meta">${esc(sel.ch.name)} · ${esc(m)}</p>` : ""}${detail(sel.s, true)}`;
+  }
+  function detail(s, inAll) {
     const E = epsOf(s), t = totalOf(s), L = listOf(s);
     const others = (BYWORK[s.work] || []).filter((o) => o.s !== s);
     const otherDubs = others.filter((o) => o.s.dub !== s.dub);
@@ -261,7 +311,7 @@
     const claim = cl && xs.u ? `<p class="claim">Έχουμε <b>${Math.min(cl.n, t || cl.n)}</b> επεισόδια${cl.b ? ` σύμφωνα με τον/την ${esc(cl.b)} (${esc(cl.d)})` : ""}, αλλά <b>${xs.u}</b> από αυτά δεν ξέρουμε ακόμα ποια είναι.
       Αν έχεις τη λίστα, γράψε στο Discord με <code>/πες</code> ποια ακριβώς είναι.</p>` : "";
     return `<div class="detail">
-      ${also ? `<div class="also"><span class="also-h">Προβλήθηκε επίσης:</span>${also}</div>` : ""}
+      ${also && !inAll ? `<div class="also"><span class="also-h">Προβλήθηκε επίσης:</span>${also}</div>` : ""}
       ${claim}
       <div class="dtools">${epf}${notesBtn}</div>
       ${grid}
@@ -280,7 +330,7 @@
   // ---------- events ----------
   $("#tabs").addEventListener("click", (e) => {
     const b = e.target.closest(".tab"); if (!b) return;
-    current = DATA.channels.find((c) => c.id === b.dataset.ch);
+    current = chById(b.dataset.ch);
     renderAll(); window.scrollTo({ top: 0 }); saveUI();
   });
   $("#chips").addEventListener("click", (e) => {
@@ -307,6 +357,8 @@
       const ol = d.querySelector(".eplist"); if (ol) ol.classList.toggle("only-notes", on);
       return;
     }
+    const pk = e.target.closest(".pick");
+    if (pk) { pick[pk.dataset.v] = +pk.dataset.i; renderList(); return; }
     const ef = e.target.closest(".epf button");
     if (ef) {
       const d = ef.closest(".detail");
@@ -327,7 +379,7 @@
     const go = e.target.closest("[data-go]");
     if (go) {
       const [cid, sid] = go.dataset.go.split("|");
-      current = DATA.channels.find((c) => c.id === cid);
+      current = chById(cid);
       query = ""; $("#search").value = ""; filter = "all"; kinds.clear();
       open.add(cid + "/" + sid); renderAll();
       const el = [...document.querySelectorAll(".row")].find((r) => r.dataset.id === sid);
@@ -364,7 +416,7 @@
       DATA.works ||= {}; DATA.dubs ||= {};
       // καρτέλες από το κανάλι με τις περισσότερες σειρές προς τις λιγότερες (σταθερή ταξινόμηση στις ισοπαλίες)
       DATA.channels.sort((a, b) => b.series.length - a.series.length);
-      indexWorks();
+      indexWorks(); buildAll();
       current = DATA.channels[0];
       const y = restoreUI();
       $("#lock").hidden = true; $("#app").hidden = false;
