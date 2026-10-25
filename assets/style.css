@@ -119,6 +119,10 @@ button.ghost { background: transparent; color: var(--muted); border: 1px solid v
 }
 .row:hover { background: color-mix(in srgb, var(--ch) 6%, transparent); }
 .row .t { font-weight: 600; }
+.cp { display: inline-block; margin-left: 6px; padding: 0 3px; font-size: 13px; line-height: 1; cursor: pointer; opacity: .45;
+  border-radius: 5px; vertical-align: 1px; user-select: none; }
+.cp:hover, .cp:focus-visible { opacity: 1; background: var(--line); }
+.cp.ok { opacity: 1; color: var(--found); font-weight: 700; }
 .row .m { color: var(--muted); font-size: 12.5px; }
 .row .count { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 13px; text-align: right; white-space: nowrap; }
 .row .count b { color: var(--ink); }
