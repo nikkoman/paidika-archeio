@@ -41,7 +41,7 @@
 - Cloudflare Worker `paidika-bot` (https://paidika-bot.me-600.workers.dev, έλεγχος: `/check`), κώδικας `discord/worker.js`.
   Ο ιδιοκτήτης τον επικολλά χειροκίνητα στο Cloudflare (Edit code → Deploy) μετά από κάθε αλλαγή.
 - Εντολές (`discord/commands.json`, καταχώριση με workflow «Καταχώριση εντολών Discord»):
-  `/πες` (απλή γλώσσα μέσω Claude Haiku, με κουμπί Επιβεβαίωση), `/βρέθηκε`, `/ελλείψεις`, `/λείπει`, `/πρόοδος`.
+  `/πες` (απλή γλώσσα μέσω Claude Haiku, με κουμπί Επιβεβαίωση· δέχεται και σκέτη σημείωση ανά επεισόδιο, op `"note"` στο `batch`, που προστίθεται χωρίς αλλαγή κατάστασης· κενή = διαγραφή), `/βρέθηκε`, `/ελλείψεις`, `/λείπει`, `/πρόοδος`.
 - Ροή: Worker → GitHub `repository_dispatch` → `.github/workflows/archive-update.yml` → commit → Pages.
 - Secrets Worker: `DISCORD_PUBLIC_KEY`, `GITHUB_TOKEN`, `INDEX_KEY`, `ANTHROPIC_API_KEY` (προαιρ. `ALLOWED_ROLE_ID`).
   Secrets GitHub: `ARCHIVE_PASSWORD`, `ARCHIVE_INDEX_KEY`, `DISCORD_APP_ID`, `DISCORD_BOT_TOKEN`, `DISCORD_GUILD_ID`.

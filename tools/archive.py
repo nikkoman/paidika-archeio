@@ -10,6 +10,7 @@
   python3 tools/archive.py encrypt /tmp/archive.json      # κρυπτογράφηση πίσω στο data/archive.enc.json
   python3 tools/archive.py mark ant1 mr-bogus 1-12 found  # σήμανση επεισοδίων (found|partial|missing)
   python3 tools/archive.py mark ant1 mr-bogus 7 partial "λείπουν 2 λεπτά στο τέλος"
+  python3 tools/archive.py batch ant1 mr-bogus '[{"range":"34","state":"note","note":"λείπουν 4 δευτ."}]'  # σημείωση χωρίς αλλαγή κατάστασης
   python3 tools/archive.py total ant1 nintama-rantaro 42   # ορισμός συνόλου επεισοδίων
   python3 tools/archive.py find bogus                      # αναζήτηση σειράς (κανάλι + id)
   python3 tools/archive.py index                           # ευρετήριο για το Discord bot (θέλει ARCHIVE_INDEX_KEY)
@@ -141,8 +142,19 @@ def main():
         s = get_series(obj, args[0], args[1])
         dub = obj["dubs"].setdefault(s["dub"], {"episodes": {}})
         ops = json.loads(args[2])
-        order = {"found": 0, "missing": 1, "partial": 2}
+        order = {"found": 0, "missing": 1, "partial": 2, "note": 3}
         for op in sorted(ops, key=lambda o: order.get(o.get("state"), 9)):
+            if op["state"] == "note":       # σημείωση χωρίς αλλαγή κατάστασης· κενή σημείωση = διαγραφή
+                note = (op.get("note") or "").strip()
+                for n in parse_range(op["range"]):
+                    e = dub["episodes"].get(str(n))
+                    if e is None:
+                        print(f"επ. {n}: λείπει, η σημείωση αγνοήθηκε")
+                    elif not note:
+                        e.pop("n", None)
+                    elif note not in e.get("n", ""):
+                        e["n"] = (e["n"] + " · " + note if e.get("n") else note)[:200]
+                continue
             state = {"found": "f", "partial": "p", "missing": None}[op["state"]]
             for n in parse_range(op["range"]):
                 if state is None:
