@@ -63,39 +63,42 @@
   const epsOf = (s) => (DATA.dubs[s.dub] || {}).episodes || {};
   const listOf = (s) => (DATA.works[s.work] || {}).eplist || null;
   const totalOf = (s) => s.total || (listOf(s) ? listOf(s).length : 0);
+  // «έχουμε Ν, άγνωστο ποια»: όσα από τα Ν δεν έχουν σημειωθεί ακόμα συγκεκριμένα
+  const claimOf = (s) => (DATA.dubs[s.dub] || {}).claim || null;
   function stats(s) {
     let f = 0, p = 0;
-    const E = epsOf(s), t = totalOf(s);
+    const E = epsOf(s), t = totalOf(s), cl = claimOf(s);
     for (const k in E) {
       if (t && +k > t) continue;
       if (E[k].s === "f") f++; else if (E[k].s === "p") p++;
     }
-    return { f, p, t };
+    const u = cl ? Math.max(0, Math.min(cl.n, t || cl.n) - f - p) : 0;
+    return { f, p, u, t };
   }
   function indexWorks() {
     BYWORK = {};
     for (const ch of DATA.channels) for (const s of ch.series) (BYWORK[s.work] ||= []).push({ ch, s });
   }
   function chStats(ch) {
-    let f = 0, p = 0, t = 0, done = 0, any = 0;
+    let f = 0, p = 0, u = 0, t = 0, done = 0, any = 0;
     for (const s of ch.series) {
-      const x = stats(s); f += x.f; p += x.p; t += x.t;
-      if (x.t && x.f + x.p >= x.t) done++;
-      if (x.f + x.p > 0) any++;
+      const x = stats(s); f += x.f; p += x.p; u += x.u; t += x.t;
+      if (x.t && x.f + x.p + x.u >= x.t) done++;
+      if (x.f + x.p + x.u > 0) any++;
     }
-    return { f, p, t, done, any, n: ch.series.length };
+    return { f, p, u, t, done, any, n: ch.series.length };
   }
   const pct = (a, b) => (b ? Math.round((a / b) * 100) : 0);
 
   // ---------- pie (SVG donut) ----------
-  function pie(f, p, t, size, stroke) {
+  function pie(f, p, t, size, stroke, u = 0) {
     const r = (size - stroke) / 2, c = 2 * Math.PI * r, cx = size / 2;
     const seg = (v, off, col) => v > 0
       ? `<circle cx="${cx}" cy="${cx}" r="${r}" fill="none" stroke="${col}" stroke-width="${stroke}"
            stroke-dasharray="${(v / t) * c} ${c}" stroke-dashoffset="${-off}" transform="rotate(-90 ${cx} ${cx})"/>` : "";
     const base = `<circle cx="${cx}" cy="${cx}" r="${r}" fill="none" stroke="${t ? "var(--missing)" : "var(--line)"}" stroke-width="${stroke}"/>`;
     const fo = t ? (f / t) * c : 0;
-    return `<svg class="pie" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-hidden="true">${base}${t ? seg(f, 0, "var(--found)") + seg(p, fo, "var(--partial)") : ""}</svg>`;
+    return `<svg class="pie" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-hidden="true">${base}${t ? seg(f, 0, "var(--found)") + seg(p, fo, "var(--partial)") + seg(u, fo + (p / t) * c, "var(--unknown)") : ""}</svg>`;
   }
 
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -105,24 +108,25 @@
     $("#tabs").innerHTML = DATA.channels.map((ch) => {
       const x = chStats(ch);
       return `<button class="tab" role="tab" style="--c:${ch.color}" aria-selected="${ch.id === current.id}" data-ch="${ch.id}" aria-label="${esc(ch.name)}">
-        <span class="logo"><img src="assets/logos/${ch.id}.png" alt="${esc(ch.name)}"></span> <small>${pct(x.f + x.p, x.t)}%</small></button>`;
+        <span class="logo"><img src="assets/logos/${ch.id}.png" alt="${esc(ch.name)}"></span> <small>${pct(x.f + x.p + x.u, x.t)}%</small></button>`;
     }).join("");
   }
   function renderSummary() {
     const x = chStats(current);
     document.documentElement.style.setProperty("--ch", current.color);
     $("#summary").innerHTML = `
-      ${pie(x.f, x.p, x.t, 92, 16)}
+      ${pie(x.f, x.p, x.t, 92, 16, x.u)}
       <div style="flex:1;min-width:240px">
         <h2><span class="logo big"><img src="assets/logos/${current.id}.png" alt=""></span>${esc(current.name)}</h2>
         <div class="stats" style="margin-top:8px">
           <div class="stat"><b>${x.n}</b><span>σειρές</span></div>
           <div class="stat"><b>${x.t.toLocaleString("el-GR")}</b><span>επεισόδια</span></div>
-          <div class="stat"><b>${(x.f + x.p).toLocaleString("el-GR")}</b><span>βρέθηκαν</span></div>
-          <div class="stat"><b>${pct(x.f + x.p, x.t)}%</b><span>ολοκλήρωση</span></div>
+          <div class="stat"><b>${(x.f + x.p + x.u).toLocaleString("el-GR")}</b><span>βρέθηκαν</span></div>
+          <div class="stat"><b>${pct(x.f + x.p + x.u, x.t)}%</b><span>ολοκλήρωση</span></div>
         </div>
         <div class="legend"><span><i style="background:var(--found)"></i>βρέθηκε</span>
           <span><i style="background:var(--partial)"></i>βρέθηκε με ελλείψεις</span>
+          <span><i style="background:var(--unknown)"></i>έχουμε, άγνωστο ποια</span>
           <span><i style="background:var(--missing)"></i>λείπει</span>
           <span>${x.done} σειρές ολοκληρωμένες · ${x.any} με κάτι</span></div>
       </div>`;
@@ -154,7 +158,7 @@
     const rows = current.series.filter((s) => {
       if (q && !norm(s.title).includes(q)) return false;
       if (kinds.size && !kindsOf(s).some((k) => kinds.has(k))) return false;
-      const x = stats(s), got = x.f + x.p;
+      const x = stats(s), got = x.f + x.p + x.u;
       if (filter === "some") return got > 0;
       if (filter === "done") return x.t > 0 && got >= x.t;
       if (filter === "none") return got === 0;
@@ -166,9 +170,9 @@
       const meta = [s.kind === "Μικτό" ? "Κινούμενα σχέδια & ζωντανής δράσης" : s.kind, s.years, s.aired ? `1η προβολή ${s.airedApprox ? "~" : ""}${s.aired}${s.dubyear && s.dubyear !== s.aired ? ` (μεταγλ. ${s.dubyear})` : ""}` : "", s.channel].filter(Boolean).join(" · ");
       return `<li class="item${isOpen ? " open" : ""}">
         <button class="row" data-id="${esc(s.id)}" aria-expanded="${isOpen}">
-          ${pie(x.f, x.p, x.t, 30, 7)}
+          ${pie(x.f, x.p, x.t, 30, 7, x.u)}
           <span class="ttl">${s.img ? `<img class="ava" src="${esc(s.img)}" alt="" loading="lazy">` : ""}<span><span class="t">${esc(s.title)}</span><br><span class="m">${esc(meta)}</span></span></span>
-          <span class="count">${x.t ? `<b>${x.f + x.p}</b> / ${x.t}` : "—"}${(BYWORK[s.work] || []).length > 1 ? `<span class="multi" title="Προβλήθηκε και σε άλλο κανάλι">⇄</span>` : ""}<span class="chev">›</span></span>
+          <span class="count">${x.t ? `<b>${x.f + x.p + x.u}</b> / ${x.t}` : "—"}${x.u ? `<span class="unk" title="${x.u} από αυτά: άγνωστο ποια">?</span>` : ""}${(BYWORK[s.work] || []).length > 1 ? `<span class="multi" title="Προβλήθηκε και σε άλλο κανάλι">⇄</span>` : ""}<span class="chev">›</span></span>
         </button>
         ${isOpen ? detail(s) : ""}
       </li>`;
@@ -210,11 +214,15 @@
       .filter((n) => E[n].n).map((n) => `<li><b>Επ. ${n}</b>${esc(E[n].n)}</li>`).join("");
     const also = others.map((o) => {
       const same = o.s.dub === s.dub, x = stats(o.s);
-      const info = same ? "ίδια μεταγλώττιση · κοινή πρόοδος" : `άλλη μεταγλώττιση${o.s.aired ? " (" + o.s.aired + ")" : ""} · ${x.f + x.p}/${x.t || "—"} βρέθηκαν`;
-      return `<button class="also-item" data-go="${o.ch.id}|${esc(o.s.id)}"><span class="logo"><img src="assets/logos/${o.ch.id}.png" alt="${esc(o.ch.name)}"></span><span>${info}</span>${same ? "" : pie(x.f, x.p, x.t, 18, 5)}</button>`;
+      const info = same ? "ίδια μεταγλώττιση · κοινή πρόοδος" : `άλλη μεταγλώττιση${o.s.aired ? " (" + o.s.aired + ")" : ""} · ${x.f + x.p + x.u}/${x.t || "—"} βρέθηκαν`;
+      return `<button class="also-item" data-go="${o.ch.id}|${esc(o.s.id)}"><span class="logo"><img src="assets/logos/${o.ch.id}.png" alt="${esc(o.ch.name)}"></span><span>${info}</span>${same ? "" : pie(x.f, x.p, x.t, 18, 5, x.u)}</button>`;
     }).join("");
+    const cl = claimOf(s), xs = stats(s);
+    const claim = cl && xs.u ? `<p class="claim">Έχουμε <b>${Math.min(cl.n, t || cl.n)}</b> επεισόδια${cl.b ? ` σύμφωνα με τον/την ${esc(cl.b)} (${esc(cl.d)})` : ""}, αλλά <b>${xs.u}</b> από αυτά δεν ξέρουμε ακόμα ποια είναι.
+      Αν έχεις τη λίστα, γράψε στο Discord με <code>/πες</code> ποια ακριβώς είναι.</p>` : "";
     return `<div class="detail">
       ${also ? `<div class="also"><span class="also-h">Προβλήθηκε επίσης:</span>${also}</div>` : ""}
+      ${claim}
       ${grid}
       ${badgeDubs.length && !(L && L.length) ? `<p class="meta">Τα επεισόδια με περίγραμμα έχουν βρεθεί από άλλη μεταγλώττιση.</p>` : ""}
       ${notes ? `<ul class="notes">${notes}</ul>` : ""}

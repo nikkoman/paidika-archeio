@@ -102,7 +102,8 @@ const unb64u = (s) => decodeURIComponent(escape(atob(s.replace(/-/g, "+").replac
 
 const SYSTEM = `Είσαι ο βοηθός ενός ελληνικού Discord server που αρχειοθετεί ψηφιοποιήσεις (από VHS) μεταγλωττισμένων παιδικών σειρών της ελληνικής τηλεόρασης.
 Τα μέλη γράφουν σε απλή, καθημερινή γλώσσα (συχνά με greeklish ή ορθογραφικά λάθη) τι βρήκαν ή ρωτούν για την πρόοδο.
-Ο κατάλογος σειρών είναι στη μορφή: κλειδί|τίτλος|κανάλια|σύνολο=Ν|βρέθηκαν=Ν|ελλείψεις=Ν.
+Ο κατάλογος σειρών είναι στη μορφή: κλειδί|τίτλος|κανάλια|σύνολο=Ν|βρέθηκαν=Ν|ελλείψεις=Ν|άγνωστα=Ν.
+«άγνωστα» = επεισόδια που κάποιος είπε ότι έχουμε, χωρίς να πει ποια. Πόσα έχουμε = βρέθηκαν + ελλείψεις + άγνωστα.
 ΠΡΟΣΟΧΗ: το «σύνολο» είναι πόσα επεισόδια έχει η σειρά, ΟΧΙ πόσα έχουμε. Πόσα έχουμε = βρέθηκαν + ελλείψεις. Μην τα μπερδεύεις.
 Κάθε γραμμή είναι μία μεταγλώττιση· όταν γράφει πολλά κανάλια (π.χ. «ΕΡΤ, MEGA»), είναι η ίδια μεταγλώττιση με κοινή πρόοδο, άρα ΜΗΝ ρωτάς για κανάλι.
 Ρώτα για κανάλι μόνο αν υπάρχουν διαφορετικές γραμμές με τον ίδιο τίτλο.
@@ -120,6 +121,9 @@ const SYSTEM = `Είσαι ο βοηθός ενός ελληνικού Discord s
 - range: π.χ. "1-12", "3,5,8". «όλα/ολόκληρο» = 1-σύνολο. Μην ξεπερνάς το σύνολο.
 - «Όλα εκτός από Χ» σημαίνει ότι βρέθηκαν όλα τα υπόλοιπα και το Χ ΛΕΙΠΕΙ: π.χ. σε σειρά 40 επεισοδίων, «όλα εκτός από το 1ο» = found "2-40" και τίποτα για το 1.
   «Εκτός από το 5 και 9» = found "1-4,6-8,10-σύνολο". Διάβαζε προσεκτικά άρνηση και εξαιρέσεις.
+- Αν ο χρήστης λέει μόνο πλήθος χωρίς ποια (π.χ. «έχουμε 45 από τα 65»), ΜΗΝ το κάνεις found 1-45. Κάνε op state="count" με count=45
+  (σημαίνει «έχουμε 45, άγνωστο ποια») και στο message ζήτα του ευγενικά, αν μπορεί, να στείλει με νέο /πες ποια ακριβώς είναι
+  (αριθμούς ή τίτλους), ώστε να σημειωθούν συγκεκριμένα. count=0 διαγράφει αυτή την ένδειξη.
 - Μην ζητάς επιβεβαίωση στο message: για kind="update" το bot δείχνει ήδη κουμπί Επιβεβαίωση. Αν είσαι σίγουρος, κάνε update κατευθείαν.
 - Μην γράφεις ότι μια σειρά υπάρχει σε πολλά κανάλια αν στον κατάλογο υπάρχει μόνο μία γραμμή με αυτόν τον τίτλο.
 - Αν κάποια επεισόδια ενός εύρους έχουν ελλείψεις, βάλε το εύρος ως found ΚΑΙ ξεχωριστά τα επεισόδια με ελλείψεις ως partial (υπερισχύουν).
@@ -139,8 +143,8 @@ const TOOL = {
       kind: { type: "string", enum: ["update", "answer", "clarify"] },
       series_key: { type: "string", description: "κλειδί σειράς από τον κατάλογο (μόνο για update)" },
       ops: { type: "array", items: { type: "object", properties: {
-        range: { type: "string" }, state: { type: "string", enum: ["found", "partial", "missing", "note"] },
-        note: { type: "string" } }, required: ["range", "state"] } },
+        range: { type: "string" }, state: { type: "string", enum: ["found", "partial", "missing", "note", "count"] },
+        note: { type: "string" }, count: { type: "integer", description: "μόνο για state=count" } }, required: ["state"] } },
       message: { type: "string", description: "κείμενο προς τον χρήστη, στα ελληνικά" },
     },
     required: ["kind", "message"],
@@ -172,6 +176,7 @@ async function historyOf(env, rows, key) {
     groups.push({ first: n, last: n, st, b, d, note });
   }
   const out = groups.map((g) => `${g.b} — ${g.d} — ${STATE_WORD[g.st] || g.st}: ${g.first === g.last ? g.first : g.first + "-" + g.last}${g.note ? ` («${g.note}»)` : ""}`);
+  if (row.cl) out.push(`${row.cl.b || "άγνωστος"} — ${row.cl.d || "παλιά"} — είπε ότι έχουμε ${row.cl.n} επεισόδια χωρίς να πει ποια (τώρα άγνωστα: ${row.u || 0})`);
   const old = row.f + row.p - list.length;
   if (old > 0) out.push(`Χωρίς στοιχεία (παλιές καταχωρίσεις): ${old} επεισόδια`);
   return out.length ? out.join("\n") : "Δεν έχει σημειωθεί κανένα επεισόδιο.";
@@ -188,7 +193,7 @@ async function episodeList(env, rows, key) {
 async function askClaude(env, rows, text) {
   const seen = new Set();
   const catalog = rows.filter((r) => !r.d || !seen.has(r.d) && seen.add(r.d))
-    .map((r) => `${r.c}:${r.i}|${r.t}|${channelsOf(rows, r)}|σύνολο=${r.n || "?"}|βρέθηκαν=${r.f}|ελλείψεις=${r.p}`).join("\n");
+    .map((r) => `${r.c}:${r.i}|${r.t}|${channelsOf(rows, r)}|σύνολο=${r.n || "?"}|βρέθηκαν=${r.f}|ελλείψεις=${r.p}|άγνωστα=${r.u || 0}`).join("\n");
   const messages = [{ role: "user", content: text }];
   for (let round = 0; round < 4; round++) {
     const last = round === 3;
@@ -222,7 +227,10 @@ async function followup(it, data) {
   });
 }
 
-const STATE_LABEL = { found: "✅ βρέθηκαν", partial: "🟧 με ελλείψεις", missing: "↩️ λείπουν", note: "📝 σημείωση" };
+const STATE_LABEL = { found: "✅ βρέθηκαν", partial: "🟧 με ελλείψεις", missing: "↩️ λείπουν", note: "📝 σημείωση", count: "🔢 πλήθος" };
+const opLine = (o) => o.state === "count"
+  ? (o.count ? `🔢 έχουμε **${o.count}** επεισόδια (άγνωστο ποια)` : "🔢 διαγραφή του «άγνωστο ποια»")
+  : `${STATE_LABEL[o.state]}: επεισόδια **${o.range}**${o.note ? ` — «${o.note}»` : o.state === "note" ? " — (διαγραφή σημείωσης)" : ""}`;
 
 async function handleSay(it, env) {
   const text = String(opt(it, "κείμενο") || "").slice(0, 500);
@@ -237,10 +245,16 @@ async function handleSay(it, env) {
     if (!row || !Array.isArray(a.ops) || !a.ops.length) return followup(it, { content: head + "Δεν κατάλαβα ποια σειρά ή ποια επεισόδια εννοείς — μπορείς να το γράψεις αλλιώς;" });
     const ops = [];
     for (const op of a.ops) {
+      if (op.state === "count") {
+        const n = Math.max(0, Math.floor(Number(op.count) || 0));
+        if (row.n && n > row.n) return followup(it, { content: head + `⚠️ Η σειρά έχει ${row.n} επεισόδια (είπες ${n}).` });
+        ops.push({ range: "", state: "count", count: n });
+        continue;
+      }
       try { ops.push({ range: parseRange(op.range, row.n), state: op.state, note: op.state === "partial" || op.state === "note" ? String(op.note || "").slice(0, 200) : "" }); }
       catch (e) { return followup(it, { content: head + "⚠️ " + e.message }); }
     }
-    const lines = ops.map((o) => `${STATE_LABEL[o.state]}: επεισόδια **${o.range}**${o.note ? ` — «${o.note}»` : o.state === "note" ? " — (διαγραφή σημείωσης)" : ""}`).join("\n");
+    const lines = ops.map(opLine).join("\n");
     const payload = b64u(JSON.stringify({ k: `${row.c}:${row.i}`, o: ops, u: user.id }));
     return followup(it, {
       content: head,
@@ -273,9 +287,9 @@ async function handleButton(it, env) {
   const rows = await index(env);
   const row = rows.find((r) => r.c === c && r.i === id) || { t: id };
   await dispatch(env, { cmd: "batch", channel: c, id, ops: JSON.stringify(p.o), by: user.global_name || user.username || "Discord",
-    title: row.t, range: p.o.map((o) => o.range).join(" "), state: "" });
+    title: row.t, range: p.o.map((o) => o.state === "count" ? `πλήθος ${o.count}` : o.range).join(" "), state: "" });
   cache.at = 0;
-  const lines = p.o.map((o) => `${STATE_LABEL[o.state]}: επεισόδια **${o.range}**${o.note ? ` — «${o.note}»` : o.state === "note" ? " — (διαγραφή σημείωσης)" : ""}`).join("\n");
+  const lines = p.o.map(opLine).join("\n");
   return json({ type: 7, data: { embeds: [{ ...emb, description: `${lines}\n\n✅ **Καταχωρήθηκε.** Το site ενημερώνεται σε 1–2 λεπτά.` }], components: [] } });
 }
 
