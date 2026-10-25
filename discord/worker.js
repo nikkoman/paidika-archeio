@@ -9,6 +9,7 @@
 
 const REPO = "nikkoman/paidika-archeio";
 const INDEX_URL = "https://nikkoman.github.io/paidika-archeio/data/index.enc.json";
+const TITLES_URL = "https://nikkoman.github.io/paidika-archeio/data/titles.enc.json";
 const SITE = "https://nikkoman.github.io/paidika-archeio/";
 
 const json = (obj, status = 200) =>
@@ -26,17 +27,32 @@ async function verify(req, body, env) {
   return crypto.subtle.verify("Ed25519", key, hex(sig), new TextEncoder().encode(ts + body));
 }
 
-let cache = { at: 0, rows: null };
-async function index(env) {
-  if (cache.rows && Date.now() - cache.at < 60_000) return cache.rows;
-  const res = await fetch(INDEX_URL + "?t=" + Date.now());
+async function fetchEnc(env, url) {
+  const res = await fetch(url + "?t=" + Date.now());
   if (!res.ok) throw new Error("ευρετήριο HTTP " + res.status);
   const env_ = await res.json();
   const key = await crypto.subtle.importKey("raw", b64(String(env.INDEX_KEY).trim()), "AES-GCM", false, ["decrypt"]);
   const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv: b64(env_.iv) }, key, b64(env_.ct));
-  cache = { at: Date.now(), rows: JSON.parse(new TextDecoder().decode(pt)) };
+  return JSON.parse(new TextDecoder().decode(pt));
+}
+
+let cache = { at: 0, rows: null };
+async function index(env) {
+  if (cache.rows && Date.now() - cache.at < 60_000) return cache.rows;
+  cache = { at: Date.now(), rows: await fetchEnc(env, INDEX_URL) };
   return cache.rows;
 }
+
+// Τίτλοι επεισοδίων ανά έργο (αλλάζουν σπάνια — κρατιούνται 10 λεπτά)
+let tcache = { at: 0, titles: null };
+async function titles(env) {
+  if (tcache.titles && Date.now() - tcache.at < 600_000) return tcache.titles;
+  tcache = { at: Date.now(), titles: await fetchEnc(env, TITLES_URL) };
+  return tcache.titles;
+}
+
+// Κανάλια που μοιράζονται την ίδια μεταγλώττιση (άρα και την ίδια πρόοδο)
+const channelsOf = (rows, row) => row.d ? rows.filter((r) => r.d === row.d).map((r) => r.cn).join(", ") : row.cn;
 
 const norm = (s) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9α-ω ]/g, "");
 const opt = (it, name) => (it.data.options || []).find((o) => o.name === name)?.value;
@@ -77,8 +93,13 @@ const unb64u = (s) => decodeURIComponent(escape(atob(s.replace(/-/g, "+").replac
 
 const SYSTEM = `Είσαι ο βοηθός ενός ελληνικού Discord server που αρχειοθετεί ψηφιοποιήσεις (από VHS) μεταγλωττισμένων παιδικών σειρών της ελληνικής τηλεόρασης.
 Τα μέλη γράφουν σε απλή, καθημερινή γλώσσα (συχνά με greeklish ή ορθογραφικά λάθη) τι βρήκαν ή ρωτούν για την πρόοδο.
-Ο κατάλογος σειρών είναι στη μορφή: κλειδί|τίτλος|κανάλι|σύνολο επεισοδίων|βρέθηκαν|με ελλείψεις.
-Τα επεισόδια αριθμούνται 1..σύνολο με τη σειρά της λίστας του site (όχι S02E05). Αν κάποιος γράψει «2ος κύκλος επ. 3», μετέτρεψέ το μόνο αν είσαι σίγουρος· αλλιώς ρώτα.
+Ο κατάλογος σειρών είναι στη μορφή: κλειδί|τίτλος|κανάλια|σύνολο επεισοδίων|βρέθηκαν|με ελλείψεις.
+Κάθε γραμμή είναι μία μεταγλώττιση· όταν γράφει πολλά κανάλια (π.χ. «ΕΡΤ, MEGA»), είναι η ίδια μεταγλώττιση με κοινή πρόοδο, άρα ΜΗΝ ρωτάς για κανάλι.
+Ρώτα για κανάλι μόνο αν υπάρχουν διαφορετικές γραμμές με τον ίδιο τίτλο.
+Τα επεισόδια αριθμούνται 1..σύνολο με τη σειρά της λίστας του site (όχι S02E05).
+Αν ο χρήστης αναφέρει τίτλο επεισοδίου, κύκλο/επεισόδιο (π.χ. «2ος κύκλος επ. 3», «S01E50») ή όνομα αρχείου, κάλεσε το εργαλείο episodes για να δεις τη λίστα με αριθμούς και τίτλους.
+Ο τίτλος υπερισχύει: αριθμοί από ονόματα αρχείων μπορεί να ακολουθούν άλλη σειρά (π.χ. παραγωγής). Αν τίτλος και αριθμός διαφωνούν, προτίμησε τον τίτλο και ανέφερέ το στο message.
+Αν ο χρήστης περιγράφει το επεισόδιο χωρίς τίτλο ή αριθμό, ψάξε στους τίτλους· αν δεν είσαι σίγουρος, ρώτα δίνοντας 2–3 πιθανές επιλογές.
 Κανόνες:
 - Καλείς ΠΑΝΤΑ το εργαλείο respond.
 - kind="update" μόνο όταν είσαι σίγουρος για τη σειρά ΚΑΙ για τα επεισόδια. Αν η σειρά ταιριάζει σε περισσότερα κανάλια και δεν διευκρινίζεται, kind="clarify" και ρώτα ποιο κανάλι, αναφέροντας τις επιλογές.
@@ -87,6 +108,10 @@ const SYSTEM = `Είσαι ο βοηθός ενός ελληνικού Discord s
 - Αν η σημείωση λέει ότι κάτι λείπει ή κόβεται (π.χ. «λείπουν 4 δευτερόλεπτα από τον διάλογο…»), χρησιμοποίησε "partial". Για άλλες παρατηρήσεις χωρίς ελλείψεις, "note".
 - Η note να είναι σύντομη (έως 200 χαρακτήρες) και να κρατά τις λεπτομέρειες του χρήστη (ονόματα χαρακτήρων, χρόνους, σημεία).
 - range: π.χ. "1-12", "3,5,8". «όλα/ολόκληρο» = 1-σύνολο. Μην ξεπερνάς το σύνολο.
+- «Όλα εκτός από Χ» σημαίνει ότι βρέθηκαν όλα τα υπόλοιπα και το Χ ΛΕΙΠΕΙ: π.χ. σε σειρά 40 επεισοδίων, «όλα εκτός από το 1ο» = found "2-40" και τίποτα για το 1.
+  «Εκτός από το 5 και 9» = found "1-4,6-8,10-σύνολο". Διάβαζε προσεκτικά άρνηση και εξαιρέσεις.
+- Μην ζητάς επιβεβαίωση στο message: για kind="update" το bot δείχνει ήδη κουμπί Επιβεβαίωση. Αν είσαι σίγουρος, κάνε update κατευθείαν.
+- Μην γράφεις ότι μια σειρά υπάρχει σε πολλά κανάλια αν στον κατάλογο υπάρχει μόνο μία γραμμή με αυτόν τον τίτλο.
 - Αν κάποια επεισόδια ενός εύρους έχουν ελλείψεις, βάλε το εύρος ως found ΚΑΙ ξεχωριστά τα επεισόδια με ελλείψεις ως partial (υπερισχύουν).
 - kind="answer" για ερωτήσεις (π.χ. πόσα έχουμε) — απάντησε σύντομα από τον κατάλογο.
 - kind="clarify" αν κάτι είναι ασαφές. Μην μαντεύεις.
@@ -109,23 +134,48 @@ const TOOL = {
   },
 };
 
+const EPISODES_TOOL = {
+  name: "episodes",
+  description: "Η λίστα επεισοδίων μιας σειράς: αριθμός (όπως τον χρησιμοποιεί το range), κύκλος/επεισόδιο και τίτλος.",
+  input_schema: { type: "object", properties: { series_key: { type: "string" } }, required: ["series_key"] },
+};
+
+async function episodeList(env, rows, key) {
+  const row = rows.find((r) => `${r.c}:${r.i}` === key);
+  if (!row) return "Άγνωστο κλειδί σειράς.";
+  const list = row.w ? (await titles(env))[row.w] : null;
+  if (!list) return "Δεν υπάρχουν τίτλοι επεισοδίων για αυτή τη σειρά.";
+  return list.map((t, i) => `${i + 1}. ${t}`).join("\n");
+}
+
 async function askClaude(env, rows, text) {
-  const catalog = rows.map((r) => `${r.c}:${r.i}|${r.t}|${r.cn}|${r.n || "?"}|${r.f}|${r.p}`).join("\n");
-  const r = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: { "x-api-key": env.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-    body: JSON.stringify({
-      model: env.MODEL || MODEL, max_tokens: 700,
-      system: [{ type: "text", text: SYSTEM }, { type: "text", text: "Κατάλογος:\n" + catalog, cache_control: { type: "ephemeral" } }],
-      tools: [TOOL], tool_choice: { type: "tool", name: "respond" },
-      messages: [{ role: "user", content: text }],
-    }),
-  });
-  if (!r.ok) throw new Error("Claude " + r.status + " " + (await r.text()).slice(0, 150));
-  const out = await r.json();
-  const use = (out.content || []).find((c) => c.type === "tool_use");
-  if (!use) throw new Error("χωρίς απάντηση");
-  return use.input;
+  const seen = new Set();
+  const catalog = rows.filter((r) => !r.d || !seen.has(r.d) && seen.add(r.d))
+    .map((r) => `${r.c}:${r.i}|${r.t}|${channelsOf(rows, r)}|${r.n || "?"}|${r.f}|${r.p}`).join("\n");
+  const messages = [{ role: "user", content: text }];
+  for (let round = 0; round < 4; round++) {
+    const last = round === 3;
+    const r = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "x-api-key": env.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+      body: JSON.stringify({
+        model: env.MODEL || MODEL, max_tokens: 700,
+        system: [{ type: "text", text: SYSTEM }, { type: "text", text: "Κατάλογος:\n" + catalog, cache_control: { type: "ephemeral" } }],
+        tools: [EPISODES_TOOL, TOOL], tool_choice: last ? { type: "tool", name: "respond" } : { type: "any" },
+        messages,
+      }),
+    });
+    if (!r.ok) throw new Error("Claude " + r.status + " " + (await r.text()).slice(0, 150));
+    const out = await r.json();
+    const uses = (out.content || []).filter((c) => c.type === "tool_use");
+    const done = uses.find((u) => u.name === "respond");
+    if (done) return done.input;
+    if (!uses.length) break;
+    messages.push({ role: "assistant", content: out.content });
+    messages.push({ role: "user", content: await Promise.all(uses.map(async (u) => ({
+      type: "tool_result", tool_use_id: u.id, content: await episodeList(env, rows, u.input.series_key) }))) });
+  }
+  throw new Error("χωρίς απάντηση");
 }
 
 async function followup(it, data) {
@@ -157,7 +207,7 @@ async function handleSay(it, env) {
     const payload = b64u(JSON.stringify({ k: `${row.c}:${row.i}`, o: ops, u: user.id }));
     return followup(it, {
       content: head,
-      embeds: [{ title: `${row.t} · ${row.cn}`, url: SITE + "#p=" + payload, color: 0x2e2a6b,
+      embeds: [{ title: `${row.t} · ${channelsOf(rows, row)}`, url: SITE + "#p=" + payload, color: 0x2e2a6b,
         description: `${a.message ? a.message + "\n\n" : ""}${lines}\n\n_Τίποτα δεν αλλάζει πριν πατήσεις Επιβεβαίωση._` }],
       components: [{ type: 1, components: [
         { type: 2, style: 3, label: "Επιβεβαίωση", custom_id: "say_ok" },

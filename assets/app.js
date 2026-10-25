@@ -13,6 +13,26 @@
     del: (k) => { try { sessionStorage.removeItem(k); } catch {} },
   };
 
+  // ---------- κατάσταση οθόνης (επιβιώνει την ανανέωση της σελίδας) ----------
+  const UI = "pa-ui";
+  function saveUI() {
+    if (!current) return;
+    store.set(UI, JSON.stringify({ ch: current.id, filter, query, sortBy, kinds: [...kinds], open: [...open], y: window.scrollY }));
+  }
+  function restoreUI() {
+    let u; try { u = JSON.parse(store.get(UI) || "null"); } catch { u = null; }
+    if (!u) return 0;
+    current = DATA.channels.find((c) => c.id === u.ch) || current;
+    filter = u.filter || "all"; query = u.query || ""; sortBy = u.sortBy || "title";
+    (u.kinds || []).forEach((k) => kinds.add(k)); (u.open || []).forEach((k) => open.add(k));
+    $("#search").value = query; $("#sort").value = sortBy;
+    return u.y || 0;
+  }
+  if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+  let saveT = 0;
+  window.addEventListener("scroll", () => { clearTimeout(saveT); saveT = setTimeout(saveUI, 200); }, { passive: true });
+  window.addEventListener("pagehide", saveUI);
+
   // ---------- crypto ----------
   const b64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
   async function decrypt(env, pw) {
@@ -203,20 +223,20 @@
   $("#tabs").addEventListener("click", (e) => {
     const b = e.target.closest(".tab"); if (!b) return;
     current = DATA.channels.find((c) => c.id === b.dataset.ch);
-    renderAll(); window.scrollTo({ top: 0 });
+    renderAll(); window.scrollTo({ top: 0 }); saveUI();
   });
   $("#chips").addEventListener("click", (e) => {
     const b = e.target.closest(".chip"); if (!b) return;
-    filter = b.dataset.f; renderChips(); renderList();
+    filter = b.dataset.f; renderChips(); renderList(); saveUI();
   });
   $("#kinds").addEventListener("click", (e) => {
     const b = e.target.closest(".chip"); if (!b) return;
     const k = b.dataset.k;
     if (!k) kinds.clear(); else kinds.has(k) ? kinds.delete(k) : kinds.add(k);
-    renderKinds(); renderList();
+    renderKinds(); renderList(); saveUI();
   });
-  $("#sort").addEventListener("change", (e) => { sortBy = e.target.value; renderList(); });
-  $("#search").addEventListener("input", (e) => { query = e.target.value; renderList(); });
+  $("#sort").addEventListener("change", (e) => { sortBy = e.target.value; renderList(); saveUI(); });
+  $("#search").addEventListener("input", (e) => { query = e.target.value; renderList(); saveUI(); });
   $("#list").addEventListener("click", (e) => {
     const go = e.target.closest("[data-go]");
     if (go) {
@@ -226,14 +246,15 @@
       open.add(cid + "/" + sid); renderAll();
       const el = [...document.querySelectorAll(".row")].find((r) => r.dataset.id === sid);
       if (el) el.scrollIntoView({ block: "center" });
+      saveUI();
       return;
     }
     const b = e.target.closest(".row"); if (!b) return;
     const k = current.id + "/" + b.dataset.id;
     open.has(k) ? open.delete(k) : open.add(k);
-    renderList();
+    renderList(); saveUI();
   });
-  $("#logout").addEventListener("click", () => { store.del(KEY); location.reload(); });
+  $("#logout").addEventListener("click", () => { store.del(KEY); store.del(UI); location.reload(); });
 
   async function start(pw, silent) {
     const msg = $("#lock-msg");
@@ -243,8 +264,10 @@
       DATA.works ||= {}; DATA.dubs ||= {};
       indexWorks();
       current = DATA.channels[0];
+      const y = restoreUI();
       $("#lock").hidden = true; $("#app").hidden = false;
       renderAll();
+      if (y) requestAnimationFrame(() => window.scrollTo({ top: y }));
     } catch (err) {
       store.del(KEY);
       if (!silent) msg.textContent = err.message === "load" ? "Δεν φορτώθηκαν τα δεδομένα. Δοκίμασε ξανά." : "Λάθος κωδικός.";
