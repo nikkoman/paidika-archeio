@@ -2,7 +2,7 @@
   "use strict";
   const $ = (s) => document.querySelector(s);
   const KEY = "pa-pw";
-  let DATA = null, current = null, filter = "all", query = "", sortBy = "title", scope = "all"; // scope: αναζήτηση σε "all" κανάλια ή "ch" (μόνο το τρέχον)
+  let DATA = null, current = null, filter = "all", query = "", sortBy = "title", scope = "ch"; // scope: αναζήτηση σε "all" κανάλια ή "ch" (μόνο το τρέχον)
   const kinds = new Set(); // empty = όλα
   const open = new Set();
 
@@ -23,13 +23,13 @@
   };
   function saveUI() {
     if (!current) return;
-    ui.set(JSON.stringify({ ch: current.id, filter, query, sortBy, scope, kinds: [...kinds], open: [...open], y: window.scrollY }));
+    ui.set(JSON.stringify({ ch: current.id, filter, query, sortBy, scope2: scope, kinds: [...kinds], open: [...open], y: window.scrollY }));
   }
   function restoreUI() {
     let u; try { u = JSON.parse(ui.get() || "null"); } catch { u = null; }
     if (!u) return 0;
     current = chById(u.ch) || current;
-    filter = u.filter || "all"; query = u.query || ""; sortBy = u.sortBy || "title"; scope = u.scope || "all";
+    filter = u.filter || "all"; query = u.query || ""; sortBy = u.sortBy || "title"; scope = u.scope2 || "ch";
     (u.kinds || []).forEach((k) => kinds.add(k)); (u.open || []).forEach((k) => open.add(k));
     $("#search").value = query; $("#sort").value = sortBy;
     return u.y || 0;
@@ -349,6 +349,7 @@
   $("#tabs").addEventListener("click", (e) => {
     const b = e.target.closest(".tab"); if (!b) return;
     current = chById(b.dataset.ch);
+    scope = "ch"; // σε νέα καρτέλα καναλιού η αναζήτηση ξεκινά μόνο σε αυτό το κανάλι
     renderAll(); window.scrollTo({ top: 0 }); saveUI();
   });
   $("#chips").addEventListener("click", (e) => {
