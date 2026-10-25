@@ -138,6 +138,7 @@
           <div class="stat"><b>${pct(x.f + x.p + x.u, x.t)}%</b><span>ολοκλήρωση</span></div>
         </div>
         <div class="legend"><span><i style="background:var(--found)"></i>βρέθηκε</span>
+          <span><i style="background:var(--found-note)"></i>βρέθηκε, με σημείωση</span>
           <span><i style="background:var(--partial)"></i>βρέθηκε με ελλείψεις</span>
           <span><i style="background:var(--unknown)"></i>έχουμε, άγνωστο ποια</span>
           <span><i style="background:var(--missing)"></i>λείπει</span>
@@ -213,11 +214,13 @@
     let grid = "";
     if (L && L.length) {
       const pad = (n, w) => String(n).padStart(w, "0");
-      const rows = L.slice(0, t || L.length).map((ep, i) => {
+      // αν το σύνολο είναι μεγαλύτερο από τη λίστα, τα υπόλοιπα επεισόδια εμφανίζονται χωρίς τίτλο
+      const LL = t > L.length ? L.concat(Array.from({ length: t - L.length }, (_, k) => ({ s: null, e: L.length + k + 1 }))) : L.slice(0, t || L.length);
+      const rows = LL.map((ep, i) => {
         const e = E[String(i + 1)], st = e ? e.s : "m";
         const code = ep.s != null ? `S${pad(ep.s, 2)}E${pad(ep.e, 3)}` : pad(ep.e, 3);
         const lab = st === "f" ? "βρέθηκε" : st === "p" ? "με ελλείψεις" : "λείπει";
-        return `<li class="epl ${st}"><span class="code">${code}</span><span class="et">${esc(ep.t || "")}${copyBtn(`${s.title} ${code}${ep.t ? " " + ep.t : ""}`, "Αντιγραφή (σειρά, επεισόδιο, τίτλος)")}${e && e.n ? `<small>${esc(e.n)}</small>` : ""}</span><span class="st">${badges(i + 1)}<b>${lab}</b></span></li>`;
+        return `<li class="epl ${st}${e && e.n ? " has-note" : ""}"><span class="code">${code}</span><span class="et">${esc(ep.t || "")}${copyBtn(`${s.title} ${code}${ep.t ? " " + ep.t : ""}`, "Αντιγραφή (σειρά, επεισόδιο, τίτλος)")}${e && e.n ? `<small>📝 ${esc(e.n)}</small>` : ""}</span><span class="st">${badges(i + 1)}<b>${lab}</b></span></li>`;
       }).join("");
       grid = `<ol class="eplist">${rows}</ol>`;
     } else if (t) {
@@ -226,14 +229,17 @@
         const e = E[String(i)], cls = e ? e.s : "";
         const other = badgeDubs.some((o) => epsOf(o.s)[String(i)]);
         const tip = `Επεισόδιο ${i}: ${e ? (e.s === "f" ? "βρέθηκε" : "βρέθηκε με ελλείψεις") : "λείπει"}${e && e.n ? " — " + e.n : ""}${e && e.b ? ` (${e.b}, ${e.d})` : ""}`;
-        cells.push(`<span class="ep ${cls}${e && e.n ? " has-note" : ""}${other ? " other" : ""}" title="${esc(tip)}">${i}</span>`);
+        cells.push(`<span class="ep ${cls}${e && e.n ? " has-note" : ""}${other ? " other" : ""}" title="${esc(tip)}"${e && e.n ? ` data-n="${i}" role="button" tabindex="0"` : ""}>${i}</span>`);
       }
       grid = `<div class="eps">${cells.join("")}</div>`;
     } else {
       grid = `<p class="no-total">Δεν έχει οριστεί ακόμα ο αριθμός επεισοδίων για αυτή τη σειρά.</p>`;
     }
     const notes = (L && L.length) ? "" : Object.keys(E).map(Number).sort((a, b) => a - b)
-      .filter((n) => E[n].n).map((n) => `<li><b>Επ. ${n}</b>${esc(E[n].n)}</li>`).join("");
+      .filter((n) => E[n].n).map((n) => `<li class="${E[n].s}" data-n="${n}"><b>Επ. ${n}</b>${esc(E[n].n)}${E[n].nb || E[n].b ? ` <i>(${esc(E[n].nb || E[n].b)}${E[n].nd || E[n].d ? ", " + esc(E[n].nd || E[n].d) : ""})</i>` : ""}</li>`).join("");
+    // κουμπί σημειώσεων: στη λίστα με τίτλους φιλτράρει, στα κουτάκια ανοίγει τη λίστα σημειώσεων
+    const nNotes = Object.values(E).filter((e) => e.n).length;
+    const notesBtn = nNotes ? `<button class="notes-btn" type="button" aria-expanded="false">📝 Σημειώσεις (${nNotes})</button>` : "";
     const also = others.map((o) => {
       const same = o.s.dub === s.dub, x = stats(o.s);
       const info = same ? "ίδια μεταγλώττιση · κοινή πρόοδος" : `άλλη μεταγλώττιση${o.s.aired ? " (" + o.s.aired + ")" : ""} · ${x.f + x.p + x.u}/${x.t || "—"} βρέθηκαν`;
@@ -245,9 +251,10 @@
     return `<div class="detail">
       ${also ? `<div class="also"><span class="also-h">Προβλήθηκε επίσης:</span>${also}</div>` : ""}
       ${claim}
+      ${notesBtn}
       ${grid}
       ${badgeDubs.length && !(L && L.length) ? `<p class="meta">Τα επεισόδια με περίγραμμα έχουν βρεθεί από άλλη μεταγλώττιση.</p>` : ""}
-      ${notes ? `<ul class="notes">${notes}</ul>` : ""}
+      ${notes ? `<ul class="notes" hidden>${notes}</ul>` : ""}
       ${s.notes ? `<p class="meta">${esc(s.notes)}</p>` : ""}
       ${s.gddb ? `<p class="meta"><a href="${esc(s.gddb)}" target="_blank" rel="noopener">Σελίδα στο GreekDubDB ↗</a></p>` : ""}
     </div>`;
@@ -280,6 +287,24 @@
   $("#list").addEventListener("click", (e) => {
     const cp = e.target.closest(".cp");
     if (cp) { e.stopPropagation(); copyText(cp.dataset.copy, cp); return; }
+    const nb = e.target.closest(".notes-btn");
+    if (nb) {
+      const d = nb.closest(".detail"), on = nb.getAttribute("aria-expanded") !== "true";
+      nb.setAttribute("aria-expanded", on);
+      const ul = d.querySelector(".notes"); if (ul) ul.hidden = !on;
+      const ol = d.querySelector(".eplist"); if (ol) ol.classList.toggle("only-notes", on);
+      return;
+    }
+    const cell = e.target.closest(".ep[data-n]");
+    if (cell) {
+      const d = cell.closest(".detail"), ul = d.querySelector(".notes");
+      if (ul) {
+        ul.hidden = false; d.querySelector(".notes-btn")?.setAttribute("aria-expanded", "true");
+        ul.querySelectorAll("li").forEach((li) => li.classList.toggle("hl", li.dataset.n === cell.dataset.n));
+        ul.querySelector(".hl")?.scrollIntoView({ block: "nearest" });
+      }
+      return;
+    }
     const go = e.target.closest("[data-go]");
     if (go) {
       const [cid, sid] = go.dataset.go.split("|");
@@ -299,6 +324,8 @@
   $("#list").addEventListener("keydown", (e) => {
     const cp = e.target.closest(".cp");
     if (cp && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); e.stopPropagation(); copyText(cp.dataset.copy, cp); }
+    const cell = e.target.closest(".ep[data-n]");
+    if (cell && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); cell.click(); }
   });
   // ο τίτλος = αρχική: πρώτη καρτέλα, χωρίς αναζήτηση/φίλτρα/ανοιχτές σειρές, στην κορυφή
   $("#home").addEventListener("click", (e) => {
