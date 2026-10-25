@@ -36,11 +36,12 @@ jobs:
           STATE: ${{ github.event.client_payload.state }}
           NOTE: ${{ github.event.client_payload.note }}
           OPS: ${{ github.event.client_payload.ops }}
+          BY: ${{ github.event.client_payload.by }}
         run: |
           case "$CMD" in
-            mark)  python3 tools/archive.py mark "$CH" "$SID" "$RANGE" "$STATE" "$NOTE" ;;
+            mark)  python3 tools/archive.py mark "$CH" "$SID" "$RANGE" "$STATE" "$NOTE" "$BY" ;;
             total) python3 tools/archive.py total "$CH" "$SID" "$RANGE" ;;
-            batch) python3 tools/archive.py batch "$CH" "$SID" "$OPS" ;;
+            batch) python3 tools/archive.py batch "$CH" "$SID" "$OPS" "$BY" ;;
             *) echo "Άγνωστη εντολή: $CMD"; exit 1 ;;
           esac
 

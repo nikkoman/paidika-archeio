@@ -10,6 +10,7 @@
 const REPO = "nikkoman/paidika-archeio";
 const INDEX_URL = "https://nikkoman.github.io/paidika-archeio/data/index.enc.json";
 const TITLES_URL = "https://nikkoman.github.io/paidika-archeio/data/titles.enc.json";
+const WHO_URL = "https://nikkoman.github.io/paidika-archeio/data/who.enc.json";
 const SITE = "https://nikkoman.github.io/paidika-archeio/";
 
 const json = (obj, status = 200) =>
@@ -49,6 +50,14 @@ async function titles(env) {
   if (tcache.titles && Date.now() - tcache.at < 600_000) return tcache.titles;
   tcache = { at: Date.now(), titles: await fetchEnc(env, TITLES_URL) };
   return tcache.titles;
+}
+
+// Ποιος σημείωσε τι και πότε (αλλάζει με κάθε καταχώριση — 1 λεπτό)
+let wcache = { at: 0, who: null };
+async function who(env) {
+  if (wcache.who && Date.now() - wcache.at < 60_000) return wcache.who;
+  wcache = { at: Date.now(), who: await fetchEnc(env, WHO_URL) };
+  return wcache.who;
 }
 
 // Κανάλια που μοιράζονται την ίδια μεταγλώττιση (άρα και την ίδια πρόοδο)
@@ -93,7 +102,8 @@ const unb64u = (s) => decodeURIComponent(escape(atob(s.replace(/-/g, "+").replac
 
 const SYSTEM = `Είσαι ο βοηθός ενός ελληνικού Discord server που αρχειοθετεί ψηφιοποιήσεις (από VHS) μεταγλωττισμένων παιδικών σειρών της ελληνικής τηλεόρασης.
 Τα μέλη γράφουν σε απλή, καθημερινή γλώσσα (συχνά με greeklish ή ορθογραφικά λάθη) τι βρήκαν ή ρωτούν για την πρόοδο.
-Ο κατάλογος σειρών είναι στη μορφή: κλειδί|τίτλος|κανάλια|σύνολο επεισοδίων|βρέθηκαν|με ελλείψεις.
+Ο κατάλογος σειρών είναι στη μορφή: κλειδί|τίτλος|κανάλια|σύνολο=Ν|βρέθηκαν=Ν|ελλείψεις=Ν.
+ΠΡΟΣΟΧΗ: το «σύνολο» είναι πόσα επεισόδια έχει η σειρά, ΟΧΙ πόσα έχουμε. Πόσα έχουμε = βρέθηκαν + ελλείψεις. Μην τα μπερδεύεις.
 Κάθε γραμμή είναι μία μεταγλώττιση· όταν γράφει πολλά κανάλια (π.χ. «ΕΡΤ, MEGA»), είναι η ίδια μεταγλώττιση με κοινή πρόοδο, άρα ΜΗΝ ρωτάς για κανάλι.
 Ρώτα για κανάλι μόνο αν υπάρχουν διαφορετικές γραμμές με τον ίδιο τίτλο.
 Τα επεισόδια αριθμούνται 1..σύνολο με τη σειρά της λίστας του site (όχι S02E05).
@@ -114,6 +124,9 @@ const SYSTEM = `Είσαι ο βοηθός ενός ελληνικού Discord s
 - Μην γράφεις ότι μια σειρά υπάρχει σε πολλά κανάλια αν στον κατάλογο υπάρχει μόνο μία γραμμή με αυτόν τον τίτλο.
 - Αν κάποια επεισόδια ενός εύρους έχουν ελλείψεις, βάλε το εύρος ως found ΚΑΙ ξεχωριστά τα επεισόδια με ελλείψεις ως partial (υπερισχύουν).
 - kind="answer" για ερωτήσεις (π.χ. πόσα έχουμε) — απάντησε σύντομα από τον κατάλογο.
+- Για «ποιος το έβαλε/πέρασε/σημείωσε» ή «από πού το ξέρουμε», κάλεσε το εργαλείο history και απάντησε π.χ.
+  «Σύμφωνα με τον lallasgr, στις 25/10/2026 18:55: βρέθηκαν τα 1-86». Αν δεν υπάρχουν στοιχεία, πες ότι είναι παλιά καταχώριση χωρίς όνομα.
+  Όταν απαντάς πόσα έχουμε από μια σειρά και υπάρχουν στοιχεία, ανέφερε σύντομα και ποιος τα πέρασε.
 - kind="clarify" αν κάτι είναι ασαφές. Μην μαντεύεις.
 - Γράφε message στα ελληνικά, φιλικά και σύντομα.`;
 
@@ -140,6 +153,30 @@ const EPISODES_TOOL = {
   input_schema: { type: "object", properties: { series_key: { type: "string" } }, required: ["series_key"] },
 };
 
+const HISTORY_TOOL = {
+  name: "history",
+  description: "Ποιος σημείωσε ποια επεισόδια μιας σειράς, πότε (ώρα Ελλάδας) και με ποια κατάσταση/σημείωση.",
+  input_schema: { type: "object", properties: { series_key: { type: "string" } }, required: ["series_key"] },
+};
+
+const STATE_WORD = { f: "βρέθηκαν", p: "με ελλείψεις" };
+async function historyOf(env, rows, key) {
+  const row = rows.find((r) => `${r.c}:${r.i}` === key);
+  if (!row) return "Άγνωστο κλειδί σειράς.";
+  const list = (row.d && (await who(env))[row.d]) || [];
+  // ομαδοποίηση συνεχόμενων επεισοδίων με ίδιο όνομα, ώρα και κατάσταση
+  const groups = [];
+  for (const [n, st, b, d, note] of list) {
+    const g = groups[groups.length - 1];
+    if (g && g.b === b && g.d === d && g.st === st && !note && !g.note && g.last === n - 1) { g.last = n; continue; }
+    groups.push({ first: n, last: n, st, b, d, note });
+  }
+  const out = groups.map((g) => `${g.b} — ${g.d} — ${STATE_WORD[g.st] || g.st}: ${g.first === g.last ? g.first : g.first + "-" + g.last}${g.note ? ` («${g.note}»)` : ""}`);
+  const old = row.f + row.p - list.length;
+  if (old > 0) out.push(`Χωρίς στοιχεία (παλιές καταχωρίσεις): ${old} επεισόδια`);
+  return out.length ? out.join("\n") : "Δεν έχει σημειωθεί κανένα επεισόδιο.";
+}
+
 async function episodeList(env, rows, key) {
   const row = rows.find((r) => `${r.c}:${r.i}` === key);
   if (!row) return "Άγνωστο κλειδί σειράς.";
@@ -151,7 +188,7 @@ async function episodeList(env, rows, key) {
 async function askClaude(env, rows, text) {
   const seen = new Set();
   const catalog = rows.filter((r) => !r.d || !seen.has(r.d) && seen.add(r.d))
-    .map((r) => `${r.c}:${r.i}|${r.t}|${channelsOf(rows, r)}|${r.n || "?"}|${r.f}|${r.p}`).join("\n");
+    .map((r) => `${r.c}:${r.i}|${r.t}|${channelsOf(rows, r)}|σύνολο=${r.n || "?"}|βρέθηκαν=${r.f}|ελλείψεις=${r.p}`).join("\n");
   const messages = [{ role: "user", content: text }];
   for (let round = 0; round < 4; round++) {
     const last = round === 3;
@@ -161,7 +198,7 @@ async function askClaude(env, rows, text) {
       body: JSON.stringify({
         model: env.MODEL || MODEL, max_tokens: 700,
         system: [{ type: "text", text: SYSTEM }, { type: "text", text: "Κατάλογος:\n" + catalog, cache_control: { type: "ephemeral" } }],
-        tools: [EPISODES_TOOL, TOOL], tool_choice: last ? { type: "tool", name: "respond" } : { type: "any" },
+        tools: [EPISODES_TOOL, HISTORY_TOOL, TOOL], tool_choice: last ? { type: "tool", name: "respond" } : { type: "any" },
         messages,
       }),
     });
@@ -173,7 +210,7 @@ async function askClaude(env, rows, text) {
     if (!uses.length) break;
     messages.push({ role: "assistant", content: out.content });
     messages.push({ role: "user", content: await Promise.all(uses.map(async (u) => ({
-      type: "tool_result", tool_use_id: u.id, content: await episodeList(env, rows, u.input.series_key) }))) });
+      type: "tool_result", tool_use_id: u.id, content: await (u.name === "history" ? historyOf : episodeList)(env, rows, u.input.series_key) }))) });
   }
   throw new Error("χωρίς απάντηση");
 }
@@ -210,8 +247,8 @@ async function handleSay(it, env) {
       embeds: [{ title: `${row.t} · ${channelsOf(rows, row)}`, url: SITE + "#p=" + payload, color: 0x2e2a6b,
         description: `${a.message ? a.message + "\n\n" : ""}${lines}\n\n_Τίποτα δεν αλλάζει πριν πατήσεις Επιβεβαίωση._` }],
       components: [{ type: 1, components: [
-        { type: 2, style: 3, label: "Επιβεβαίωση", custom_id: "say_ok" },
-        { type: 2, style: 4, label: "Ακύρωση", custom_id: "say_no" },
+        { type: 2, style: 3, label: "Επιβεβαίωση", custom_id: "say_ok:" + (user.id || "") },
+        { type: 2, style: 4, label: "Ακύρωση", custom_id: "say_no:" + (user.id || "") },
       ] }],
     });
   } catch (e) {
@@ -225,8 +262,10 @@ async function handleButton(it, env) {
   if (!m) return json({ type: 7, data: { content: "Η πρόταση έληξε.", embeds: [], components: [] } });
   const p = JSON.parse(unb64u(m[1]));
   const user = it.member?.user || it.user || {};
-  if (p.u && user.id !== p.u) return reply("Μόνο όποιος έστειλε το μήνυμα μπορεί να το επιβεβαιώσει.", true);
-  if (it.data.custom_id === "say_no")
+  const [action, owner] = String(it.data.custom_id).split(":");
+  if ((p.u || owner) && user.id !== (p.u || owner))
+    return reply("Μόνο όποιος έστειλε το μήνυμα μπορεί να το επιβεβαιώσει ή να το ακυρώσει.", true);
+  if (action === "say_no")
     return json({ type: 7, data: { embeds: [{ ...emb, description: "❌ Ακυρώθηκε — δεν άλλαξε τίποτα." }], components: [] } });
   if (env.ALLOWED_ROLE_ID && !(it.member?.roles || []).includes(env.ALLOWED_ROLE_ID))
     return reply("Δεν έχεις δικαίωμα να αλλάζεις το αρχείο.", true);
