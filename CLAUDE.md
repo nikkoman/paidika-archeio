@@ -46,6 +46,13 @@
 - Secrets Worker: `DISCORD_PUBLIC_KEY`, `GITHUB_TOKEN`, `INDEX_KEY`, `ANTHROPIC_API_KEY` (προαιρ. `ALLOWED_ROLE_ID`).
   Secrets GitHub: `ARCHIVE_PASSWORD`, `ARCHIVE_INDEX_KEY`, `DISCORD_APP_ID`, `DISCORD_BOT_TOKEN`, `DISCORD_GUILD_ID`.
 
+## Νέα συνεδρία — πρώτα βήματα
+- Ζήτα από τον ιδιοκτήτη τον κωδικό του site (`ARCHIVE_PASSWORD`) και το `ARCHIVE_INDEX_KEY` — δεν υπάρχουν στο repo.
+- Πρόσθεση σειράς: ο χρήστης δίνει τίτλο/link GreekDubDB + κανάλι (+ τυχόν περιορισμό επεισοδίων).
+  Δεν υπάρχει εντολή `add`: `decrypt` σε αρχείο εκτός repo → προσθήκη στο `channels[].series[]` (`work`=`g<id>`, `dub`=`<work>@<έτος>`,
+  έλεγχος αν το ίδιο `work`/μεταγλώττιση υπάρχει ήδη σε άλλο κανάλι) → `encrypt` → `eplist` από πηγές → `index` → commit/push.
+- Νέο κανάλι: νέο στοιχείο στο `channels[]` (`id`, `name`, `series`) + λογότυπο `assets/logos/<id>.png` (από τον χρήστη).
+
 ## Εκκρεμότητες / ιδέες
 - Μεταγενέστερες μεταγλωττίσεις (π.χ. Nils 2008) ως «ταμπέλες» μέσα στη σειρά, χωρίς να φορτώνεται η λίστα — συμφωνήθηκε ως ιδέα, δεν έχει υλοποιηθεί.
 - Herman & Katnip (ANT1): ο χρήστης θα πει ποια σκετς περιλαμβάνει.
