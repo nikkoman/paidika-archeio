@@ -44,6 +44,9 @@
 ## Discord bot
 - Cloudflare Worker `paidika-bot` (https://paidika-bot.me-600.workers.dev, έλεγχος: `/check`), κώδικας `discord/worker.js`.
   Ο ιδιοκτήτης τον επικολλά χειροκίνητα στο Cloudflare (Edit code → Deploy) μετά από κάθε αλλαγή.
+  **Κάθε φορά** που αλλάζει ο Worker, δώσε στον ιδιοκτήτη και τα δύο links (μπαίνει από διαφορετικά PC):
+  κώδικας https://github.com/nikkoman/paidika-archeio/blob/main/discord/worker.js (κουμπί «Copy raw file») ·
+  Cloudflare https://dash.cloudflare.com/?to=/:account/workers/services/view/paidika-bot/production
 - Εντολές (`discord/commands.json`, καταχώριση με workflow «Καταχώριση εντολών Discord»):
   `/πες` (απλή γλώσσα μέσω Claude Haiku, με κουμπί Επιβεβαίωση· δέχεται και σκέτη σημείωση ανά επεισόδιο, op `"note"` στο `batch`, που προστίθεται χωρίς αλλαγή κατάστασης· κενή = διαγραφή), `/βρέθηκε`, `/ελλείψεις`, `/λείπει`, `/πρόοδος`.
 - Failsafe (στον κώδικα του Worker, `guard`): μία σειρά ανά αίτημα· χωρίς δικαιώματα διαχειριστή (Discord usernames `dr_slump` = ιδιοκτήτης, `diafanos`, `tasmanix` — λίστα `ADMINS` στο worker.js — ή `ADMIN_ROLE_ID`)
