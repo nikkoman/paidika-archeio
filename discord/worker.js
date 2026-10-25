@@ -104,7 +104,7 @@ const unb64u = (s) => decodeURIComponent(escape(atob(s.replace(/-/g, "+").replac
 
 const SYSTEM = `Είσαι ο βοηθός ενός ελληνικού Discord server που αρχειοθετεί ψηφιοποιήσεις (από VHS) μεταγλωττισμένων παιδικών σειρών της ελληνικής τηλεόρασης.
 Τα μέλη γράφουν σε απλή, καθημερινή γλώσσα (συχνά με greeklish ή ορθογραφικά λάθη) τι βρήκαν ή ρωτούν για την πρόοδο.
-Ο κατάλογος σειρών είναι στη μορφή: κλειδί|τίτλος|κανάλια|σύνολο=Ν|βρέθηκαν=Ν|ελλείψεις=Ν|άγνωστα=Ν.
+Ο κατάλογος σειρών είναι στη μορφή: κλειδί|τίτλος / ελληνικός τίτλος|κανάλια|σύνολο=Ν|βρέθηκαν=Ν|ελλείψεις=Ν|άγνωστα=Ν.
 «άγνωστα» = επεισόδια που κάποιος είπε ότι έχουμε, χωρίς να πει ποια. Πόσα έχουμε = βρέθηκαν + ελλείψεις + άγνωστα.
 ΠΡΟΣΟΧΗ: το «σύνολο» είναι πόσα επεισόδια έχει η σειρά, ΟΧΙ πόσα έχουμε. Πόσα έχουμε = βρέθηκαν + ελλείψεις. Μην τα μπερδεύεις.
 Κάθε γραμμή είναι μία μεταγλώττιση· όταν γράφει πολλά κανάλια (π.χ. «ΕΡΤ, MEGA»), είναι η ίδια μεταγλώττιση με κοινή πρόοδο, άρα ΜΗΝ ρωτάς για κανάλι.
@@ -196,10 +196,49 @@ async function episodeList(env, rows, key) {
   return list.map((t, i) => `${i + 1}. ${t}`).join("\n");
 }
 
+// Για να μη στέλνεται όλος ο κατάλογος (~1.400 σειρές) στο Claude, κρατάμε τις σειρές που μοιάζουν με το μήνυμα
+// (αγγλικός ή ελληνικός τίτλος, και σε greeklish) ή, αν δεν ταιριάζει καμία, του καναλιού που αναφέρεται.
+// Αν δεν βρεθεί τίποτα, στέλνεται ολόκληρος ο κατάλογος όπως πριν.
+const GR = { α: "a", β: "v", γ: "g", δ: "d", ε: "e", ζ: "z", η: "i", θ: "th", ι: "i", κ: "k", λ: "l", μ: "m", ν: "n", ξ: "x",
+  ο: "o", π: "p", ρ: "r", σ: "s", ς: "s", τ: "t", υ: "i", φ: "f", χ: "ch", ψ: "ps", ω: "o" };
+const latin = (s) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+  .replace(/ου/g, "ou").replace(/μπ/g, "b").replace(/ντ/g, "d").replace(/γκ/g, "g").replace(/[α-ω]/g, (c) => GR[c] || c)
+  .replace(/ou/g, "u").replace(/ch/g, "k").replace(/h/g, "").replace(/y/g, "i").replace(/w/g, "o").replace(/c/g, "k").replace(/[^a-z0-9]+/g, " ").trim();
+const grams = (s) => { const g = new Set(); for (const w of latin(s).split(" ")) if (w.length > 2) for (let i = 0; i + 3 <= w.length; i++) g.add(w.slice(i, i + 3)); return g; };
+// Βάρος κάθε τριγράμματος: σπάνια (π.χ. «gum») μετράνε πολύ, συχνά (π.χ. «adv», «the») λίγο
+let idfCache = { rows: null, idf: null };
+function idfOf(rows) {
+  if (idfCache.rows === rows) return idfCache.idf;
+  const df = new Map();
+  for (const r of rows) for (const g of new Set([...grams(r.t), ...grams(r.g || "")])) df.set(g, (df.get(g) || 0) + 1);
+  const idf = new Map([...df].map(([g, n]) => [g, Math.log(rows.length / n)]));
+  idfCache = { rows, idf };
+  return idf;
+}
+function candidates(rows, text) {
+  const msg = grams(text), words = " " + latin(text) + " ", idf = idfOf(rows);
+  const score = (title) => {
+    let all = 0, hit = 0;
+    for (const g of grams(title || "")) { const w = idf.get(g) || 0; all += w; if (msg.has(g)) hit += w; }
+    return all ? hit / all : 0;
+  };
+  const scored = rows.map((r) => [r, Math.max(score(r.t), score((r.g || "").replace(/\(\d{4}\)/g, "")))]).sort((a, b) => b[1] - a[1]);
+  const best = scored.length ? scored[0][1] : 0;
+  const hits = best >= 0.5 ? scored.filter(([, s]) => s >= Math.max(0.35, best * 0.6)).slice(0, 30).map(([r]) => r) : [];
+  const chans = [...new Set(rows.map((r) => r.cn))].filter((cn) => words.includes(" " + latin(cn) + " "));
+  if (hits.length) {
+    // όλα τα κανάλια όπου υπάρχουν τα ίδια έργα, ώστε να φαίνονται οι διαφορετικές μεταγλωττίσεις
+    const works = new Set(hits.map((r) => r.w));
+    return rows.filter((r) => works.has(r.w) || hits.includes(r));
+  }
+  if (chans.length) return rows.filter((r) => chans.includes(r.cn));
+  return rows;
+}
+
 async function askClaude(env, rows, text) {
-  const seen = new Set();
-  const catalog = rows.filter((r) => !r.d || !seen.has(r.d) && seen.add(r.d))
-    .map((r) => `${r.c}:${r.i}|${r.t}|${channelsOf(rows, r)}|σύνολο=${r.n || "?"}|βρέθηκαν=${r.f}|ελλείψεις=${r.p}|άγνωστα=${r.u || 0}`).join("\n");
+  const seen = new Set(), pick = candidates(rows, text), partial = pick.length < rows.length;
+  const catalog = pick.filter((r) => !r.d || !seen.has(r.d) && seen.add(r.d))
+    .map((r) => `${r.c}:${r.i}|${r.t}${r.g ? " / " + r.g : ""}|${channelsOf(rows, r)}|σύνολο=${r.n || "?"}|βρέθηκαν=${r.f}|ελλείψεις=${r.p}|άγνωστα=${r.u || 0}`).join("\n");
   const messages = [{ role: "user", content: text }];
   for (let round = 0; round < 4; round++) {
     const last = round === 3;
@@ -208,7 +247,7 @@ async function askClaude(env, rows, text) {
       headers: { "x-api-key": env.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json" },
       body: JSON.stringify({
         model: env.MODEL || MODEL, max_tokens: 700,
-        system: [{ type: "text", text: SYSTEM }, { type: "text", text: "Κατάλογος:\n" + catalog, cache_control: { type: "ephemeral" } }],
+        system: [{ type: "text", text: SYSTEM }, { type: "text", text: (partial ? "Κατάλογος (μόνο οι σειρές που μοιάζουν με το μήνυμα· αν η σειρά του χρήστη δεν είναι εδώ, kind=\"clarify\" και ζήτα τον τίτλο όπως γράφεται στο site):\n" : "Κατάλογος:\n") + catalog, cache_control: { type: "ephemeral" } }],
         tools: [EPISODES_TOOL, HISTORY_TOOL, TOOL], tool_choice: last ? { type: "tool", name: "respond" } : { type: "any" },
         messages,
       }),

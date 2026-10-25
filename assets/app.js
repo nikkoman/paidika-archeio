@@ -169,7 +169,7 @@
   function renderList() {
     const q = norm(query.trim());
     const rows = current.series.filter((s) => {
-      if (q && !norm(s.title).includes(q)) return false;
+      if (q && !norm(s.title + " " + (s.gr || "")).includes(q)) return false;
       if (kinds.size && !kindsOf(s).some((k) => kinds.has(k))) return false;
       const x = stats(s), got = x.f + x.p + x.u;
       if (filter === "some") return got > 0;
