@@ -201,6 +201,13 @@
     b.textContent = all ? "Όλα τα κανάλια" : "Μόνο " + current.name;
     $("#search").placeholder = all ? "Αναζήτηση σε όλα τα κανάλια…" : "Αναζήτηση στο " + current.name + "…";
   }
+  // «σώζεται λιγότερο από το μισό»: ελλείψεις με σημείωση «(έχουμε) μόνο X λεπτά/δευτερόλεπτα», X < 11 λεπτά
+  const mostlyLost = (e) => {
+    if (!e || e.s !== "p" || !e.n) return false;
+    const m = e.n.match(/(?:μόνο|έχουμε)\s+(\d+)\s*(λεπτ|δευτ)/i);
+    return !!m && (m[2].toLowerCase().startsWith("δευτ") || +m[1] < 11);
+  };
+  const nf = (e) => !e || mostlyLost(e); // «δεν βρέθηκε» για το φίλτρο
   function detail(s) {
     const E = epsOf(s), t = totalOf(s), L = listOf(s);
     const others = (BYWORK[s.work] || []).filter((o) => o.s !== s);
@@ -220,7 +227,7 @@
         const e = E[String(i + 1)], st = e ? e.s : "m";
         const code = ep.s != null ? `S${pad(ep.s, 2)}E${pad(ep.e, 3)}` : pad(ep.e, 3);
         const lab = st === "f" ? "βρέθηκε" : st === "p" ? "με ελλείψεις" : "λείπει";
-        return `<li class="epl ${st}${e && e.n ? " has-note" : ""}${e && e.src ? " has-src" : ""}"><span class="code">${code}</span><span class="et">${esc(ep.t || "")}${copyBtn(`${s.title} ${code}${ep.t ? " " + ep.t : ""}`, "Αντιγραφή (σειρά, επεισόδιο, τίτλος)")}${e && e.n ? `<small>📝 ${esc(e.n)}</small>` : ""}${e && e.src ? `<small class="src">📼 ${esc(e.src)}</small>` : ""}</span><span class="st">${badges(i + 1)}<b>${lab}</b></span></li>`;
+        return `<li class="epl ${st}${nf(e) ? " nf" : ""}${e && e.n ? " has-note" : ""}${e && e.src ? " has-src" : ""}"><span class="code">${code}</span><span class="et">${esc(ep.t || "")}${copyBtn(`${s.title} ${code}${ep.t ? " " + ep.t : ""}`, "Αντιγραφή (σειρά, επεισόδιο, τίτλος)")}${e && e.n ? `<small>📝 ${esc(e.n)}</small>` : ""}${e && e.src ? `<small class="src">📼 ${esc(e.src)}</small>` : ""}</span><span class="st">${badges(i + 1)}<b>${lab}</b></span></li>`;
       }).join("");
       grid = `<ol class="eplist">${rows}</ol>`;
     } else if (t) {
@@ -229,7 +236,7 @@
         const e = E[String(i)], cls = e ? e.s : "";
         const other = badgeDubs.some((o) => epsOf(o.s)[String(i)]);
         const tip = `Επεισόδιο ${i}: ${e ? (e.s === "f" ? "βρέθηκε" : "βρέθηκε με ελλείψεις") : "λείπει"}${e && e.n ? " — " + e.n : ""}${e && e.src ? " — Πηγές: " + e.src : ""}${e && e.b ? ` (${e.b}, ${e.d})` : ""}`;
-        cells.push(`<span class="ep ${cls}${e && e.n ? " has-note" : ""}${other ? " other" : ""}" title="${esc(tip)}"${e && (e.n || e.src) ? ` data-n="${i}" role="button" tabindex="0"` : ""}>${i}</span>`);
+        cells.push(`<span class="ep ${cls}${nf(e) ? " nf" : ""}${e && e.n ? " has-note" : ""}${other ? " other" : ""}" title="${esc(tip)}"${e && (e.n || e.src) ? ` data-n="${i}" role="button" tabindex="0"` : ""}>${i}</span>`);
       }
       grid = `<div class="eps">${cells.join("")}</div>`;
     } else {
@@ -240,6 +247,11 @@
     // κουμπί σημειώσεων: στη λίστα με τίτλους φιλτράρει, στα κουτάκια ανοίγει τη λίστα σημειώσεων
     const nNotes = Object.values(E).filter((e) => e.n || e.src).length;
     const notesBtn = nNotes ? `<button class="notes-btn" type="button" aria-expanded="false">📝 Σημειώσεις (${nNotes})</button>` : "";
+    // φίλτρο επεισοδίων: όλα / βρέθηκαν (ακόμα και με ελλείψεις, αν σώζεται τουλάχιστον το μισό) / δεν βρέθηκαν
+    const N = t || (L ? L.length : 0);
+    let nNF = 0; for (let i = 1; i <= N; i++) if (nf(E[String(i)])) nNF++;
+    const epf = N && nNF && nNF < N ? `<div class="epf" role="group" aria-label="Φίλτρο επεισοδίων">
+      <button type="button" data-ef="" aria-pressed="true">Όλα (${N})</button><button type="button" data-ef="f" aria-pressed="false">Βρέθηκαν (${N - nNF})</button><button type="button" data-ef="m" aria-pressed="false">Δεν βρέθηκαν (${nNF})</button></div>` : "";
     const also = others.map((o) => {
       const same = o.s.dub === s.dub, x = stats(o.s);
       const info = same ? "ίδια μεταγλώττιση · κοινή πρόοδος" : `άλλη μεταγλώττιση${o.s.aired ? " (" + o.s.aired + ")" : ""} · ${x.f + x.p + x.u}/${x.t || "—"} βρέθηκαν`;
@@ -251,7 +263,7 @@
     return `<div class="detail">
       ${also ? `<div class="also"><span class="also-h">Προβλήθηκε επίσης:</span>${also}</div>` : ""}
       ${claim}
-      ${notesBtn}
+      <div class="dtools">${epf}${notesBtn}</div>
       ${grid}
       ${badgeDubs.length && !(L && L.length) ? `<p class="meta">Τα επεισόδια με περίγραμμα έχουν βρεθεί από άλλη μεταγλώττιση.</p>` : ""}
       ${notes ? `<ul class="notes" hidden>${notes}</ul>` : ""}
@@ -293,6 +305,13 @@
       nb.setAttribute("aria-expanded", on);
       const ul = d.querySelector(".notes"); if (ul) ul.hidden = !on;
       const ol = d.querySelector(".eplist"); if (ol) ol.classList.toggle("only-notes", on);
+      return;
+    }
+    const ef = e.target.closest(".epf button");
+    if (ef) {
+      const d = ef.closest(".detail");
+      d.dataset.ef = ef.dataset.ef;
+      d.querySelectorAll(".epf button").forEach((x) => x.setAttribute("aria-pressed", x === ef));
       return;
     }
     const cell = e.target.closest(".ep[data-n]");
