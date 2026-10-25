@@ -94,7 +94,8 @@ def write_index(obj):
     # ποιος σημείωσε τι και πότε, ανά μεταγλώττιση: {dub: [[επ, κατάσταση, όνομα, ημ/νία, σημείωση], ...]}
     who = {}
     for dub, v in obj.get("dubs", {}).items():
-        lst = [[int(n), e.get("s"), e.get("b"), e.get("d"), e.get("n", "")] for n, e in v.get("episodes", {}).items() if e.get("b")]
+        # όλα τα σημειωμένα επεισόδια (όνομα null = παλιά καταχώριση χωρίς όνομα) — το bot τα χρειάζεται για το failsafe
+        lst = [[int(n), e.get("s"), e.get("b"), e.get("d"), e.get("n", "")] for n, e in v.get("episodes", {}).items()]
         if lst:
             who[dub] = sorted(lst)
     for path, data in ((INDEX, rows), (TITLES, titles), (WHO, who)):

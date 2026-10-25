@@ -6,6 +6,7 @@
 //   INDEX_KEY           το ίδιο κλειδί με το GitHub secret ARCHIVE_INDEX_KEY
 //   ANTHROPIC_API_KEY   κλειδί API του Claude (console.anthropic.com) για την εντολή /πες
 //   ALLOWED_ROLE_ID     (προαιρετικό) μόνο μέλη με αυτόν τον ρόλο αλλάζουν δεδομένα
+//   ADMIN_ROLE_ID       (προαιρετικό) ρόλος διαχειριστή· οι Administrator/Manage Server του Discord μετράνε ήδη ως διαχειριστές
 
 const REPO = "nikkoman/paidika-archeio";
 const INDEX_URL = "https://nikkoman.github.io/paidika-archeio/data/index.enc.json";
@@ -132,6 +133,9 @@ const SYSTEM = `Είσαι ο βοηθός ενός ελληνικού Discord s
   «Σύμφωνα με τον lallasgr, στις 25/10/2026 18:55: βρέθηκαν τα 1-86». Αν δεν υπάρχουν στοιχεία, πες ότι είναι παλιά καταχώριση χωρίς όνομα.
   Όταν απαντάς πόσα έχουμε από μια σειρά και υπάρχουν στοιχεία, ανέφερε σύντομα και ποιος τα πέρασε.
 - kind="clarify" αν κάτι είναι ασαφές. Μην μαντεύεις.
+- Κάθε update αφορά ΜΙΑ σειρά. Αν ζητηθεί αλλαγή σε πολλές ή «σε όλες τις σειρές», ΜΗΝ προτείνεις να το κάνεις:
+  kind="answer" και εξήγησε ότι το bot αλλάζει μία σειρά τη φορά και ότι μαζικές αλλαγές κάνει μόνο διαχειριστής.
+- Μαζικό «λείπει» (πάνω από 10 επεισόδια) ή αναίρεση επεισοδίων άλλου μέλους επιτρέπεται μόνο σε διαχειριστές· το bot το ελέγχει μόνο του.
 - Γράφε message στα ελληνικά, φιλικά και σύντομα.`;
 
 const TOOL = {
@@ -167,7 +171,8 @@ const STATE_WORD = { f: "βρέθηκαν", p: "με ελλείψεις" };
 async function historyOf(env, rows, key) {
   const row = rows.find((r) => `${r.c}:${r.i}` === key);
   if (!row) return "Άγνωστο κλειδί σειράς.";
-  const list = (row.d && (await who(env))[row.d]) || [];
+  const all = (row.d && (await who(env))[row.d]) || [];
+  const list = all.filter((x) => x[2]);
   // ομαδοποίηση συνεχόμενων επεισοδίων με ίδιο όνομα, ώρα και κατάσταση
   const groups = [];
   for (const [n, st, b, d, note] of list) {
@@ -177,7 +182,7 @@ async function historyOf(env, rows, key) {
   }
   const out = groups.map((g) => `${g.b} — ${g.d} — ${STATE_WORD[g.st] || g.st}: ${g.first === g.last ? g.first : g.first + "-" + g.last}${g.note ? ` («${g.note}»)` : ""}`);
   if (row.cl) out.push(`${row.cl.b || "άγνωστος"} — ${row.cl.d || "παλιά"} — είπε ότι έχουμε ${row.cl.n} επεισόδια χωρίς να πει ποια (τώρα άγνωστα: ${row.u || 0})`);
-  const old = row.f + row.p - list.length;
+  const old = all.length - list.length;
   if (old > 0) out.push(`Χωρίς στοιχεία (παλιές καταχωρίσεις): ${old} επεισόδια`);
   return out.length ? out.join("\n") : "Δεν έχει σημειωθεί κανένα επεισόδιο.";
 }
@@ -232,6 +237,40 @@ const opLine = (o) => o.state === "count"
   ? (o.count ? `🔢 έχουμε **${o.count}** επεισόδια (άγνωστο ποια)` : "🔢 διαγραφή του «άγνωστο ποια»")
   : `${STATE_LABEL[o.state]}: επεισόδια **${o.range}**${o.note ? ` — «${o.note}»` : o.state === "note" ? " — (διαγραφή σημείωσης)" : ""}`;
 
+// ---------- failsafe: τι επιτρέπεται χωρίς δικαιώματα διαχειριστή ----------
+const MAX_REMOVE = 10;
+const displayName = (it) => { const u = it.member?.user || it.user || {}; return u.global_name || u.username || "Discord"; };
+function isAdmin(it, env) {
+  const perms = BigInt(it.member?.permissions || 0);
+  if (perms & 0x8n || perms & 0x20n) return true; // Administrator ή Manage Server
+  return !!(env.ADMIN_ROLE_ID && (it.member?.roles || []).includes(env.ADMIN_ROLE_ID));
+}
+function expand(spec) {
+  const out = [];
+  for (const part of String(spec || "").split(",").filter(Boolean)) {
+    const [a, b = a] = part.split("-").map(Number);
+    for (let n = a; n <= b && out.length < 5000; n++) out.push(n);
+  }
+  return out;
+}
+// Επιστρέφει μήνυμα άρνησης ή null. Ελέγχει: πόσα επεισόδια αφαιρούνται και αν ανήκουν σε άλλο μέλος.
+async function guard(it, env, row, ops) {
+  if (isAdmin(it, env)) return null;
+  const me = displayName(it);
+  const removing = ops.filter((o) => o.state === "missing").flatMap((o) => expand(o.range));
+  if (removing.length > MAX_REMOVE)
+    return `Για ασφάλεια, «λείπει» γίνεται έως ${MAX_REMOVE} επεισόδια τη φορά (ζήτησες ${removing.length}). Για περισσότερα, ρώτα έναν διαχειριστή.`;
+  const marks = row.d ? (await who(env))[row.d] || [] : [];
+  const byEp = new Map(marks.map(([n, , b]) => [n, b]));
+  // επεισόδια που έχουν βρεθεί από άλλο μέλος ή από παλιά καταχώριση χωρίς όνομα (όσα δεν έχουν βρεθεί δεν πειράζονται)
+  const foreign = removing.filter((n) => byEp.has(n) && byEp.get(n) !== me);
+  if (foreign.length)
+    return `Τα επεισόδια ${foreign.slice(0, 10).join(", ")}${foreign.length > 10 ? "…" : ""} τα είχε περάσει άλλο μέλος. Μπορείς να αναιρέσεις μόνο ό,τι πέρασες εσύ — για τα υπόλοιπα ρώτα έναν διαχειριστή.`;
+  if (ops.some((o) => o.state === "count" && !o.count) && row.cl && row.cl.b !== me)
+    return "Το «έχουμε Ν, άγνωστο ποια» το είχε περάσει άλλο μέλος — μόνο εκείνο ή ένας διαχειριστής μπορεί να το σβήσει.";
+  return null;
+}
+
 async function handleSay(it, env) {
   const text = String(opt(it, "κείμενο") || "").slice(0, 500);
   const user = it.member?.user || it.user || {};
@@ -254,6 +293,8 @@ async function handleSay(it, env) {
       try { ops.push({ range: parseRange(op.range, row.n), state: op.state, note: op.state === "partial" || op.state === "note" ? String(op.note || "").slice(0, 200) : "" }); }
       catch (e) { return followup(it, { content: head + "⚠️ " + e.message }); }
     }
+    const denied = await guard(it, env, row, ops);
+    if (denied) return followup(it, { content: head + "🛑 " + denied });
     const lines = ops.map(opLine).join("\n");
     const payload = b64u(JSON.stringify({ k: `${row.c}:${row.i}`, o: ops, u: user.id }));
     return followup(it, {
@@ -286,6 +327,8 @@ async function handleButton(it, env) {
   const [c, id] = p.k.split(":");
   const rows = await index(env);
   const row = rows.find((r) => r.c === c && r.i === id) || { t: id };
+  const denied = await guard(it, env, row, p.o);
+  if (denied) return json({ type: 7, data: { embeds: [{ ...emb, description: "🛑 " + denied }], components: [] } });
   await dispatch(env, { cmd: "batch", channel: c, id, ops: JSON.stringify(p.o), by: user.global_name || user.username || "Discord",
     title: row.t, range: p.o.map((o) => o.state === "count" ? `πλήθος ${o.count}` : o.range).join(" "), state: "" });
   cache.at = 0;
@@ -331,6 +374,8 @@ async function handle(it, env, ctx) {
   if (!state) return reply("Άγνωστη εντολή.", true);
   let range;
   try { range = parseRange(opt(it, "επεισόδια"), row.n); } catch (e) { return reply(e.message, true); }
+  const denied = await guard(it, env, row, [{ state, range }]);
+  if (denied) return reply("🛑 " + denied, true);
   const note = state === "partial" ? String(opt(it, "σημείωση") || "").slice(0, 200) : "";
   const by = it.member?.user?.global_name || it.member?.user?.username || it.user?.username || "Discord";
 
