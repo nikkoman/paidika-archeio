@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="el">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Παιδικό Αρχείο</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@500;700&family=Commissioner:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect x='2' y='7' width='28' height='18' rx='3' fill='%23222'/><circle cx='11' cy='16' r='4' fill='%23f5c242'/><circle cx='21' cy='16' r='4' fill='%23f5c242'/></svg>">
+</head>
+<body>
+
+<section id="lock" class="lock">
+  <div class="lock-card">
+    <div class="tape" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+    <h1>Παιδικό Αρχείο</h1>
+    <p class="lock-sub">Μεταγλωττισμένες παιδικές σειρές της ελληνικής τηλεόρασης · έως το 2003</p>
+    <form id="lock-form" autocomplete="off">
+      <label for="pw" class="sr">Κωδικός</label>
+      <input id="pw" type="password" placeholder="Κωδικός πρόσβασης" required>
+      <button type="submit">Είσοδος</button>
+    </form>
+    <p id="lock-msg" class="lock-msg" role="alert"></p>
+  </div>
+</section>
+
+<main id="app" class="app" hidden>
+  <header class="top">
+    <div class="tape" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+    <div class="top-row">
+      <div>
+        <h1>Παιδικό Αρχείο</h1>
+        <p class="updated" id="updated"></p>
+      </div>
+      <button class="ghost" id="logout" type="button">Έξοδος</button>
+    </div>
+    <nav class="tabs" id="tabs" aria-label="Κανάλια"></nav>
+  </header>
+
+  <section class="summary" id="summary"></section>
+
+  <section class="controls">
+    <input id="search" type="search" placeholder="Αναζήτηση σειράς…" aria-label="Αναζήτηση">
+    <div class="chips" id="chips" role="group" aria-label="Φίλτρο"></div>
+  </section>
+
+  <ul class="list" id="list"></ul>
+  <p class="empty" id="empty" hidden>Καμία σειρά δεν ταιριάζει με την αναζήτηση.</p>
+
+  <footer class="foot">
+    Στοιχεία σειρών: <a href="https://www.greekdubdb.com" target="_blank" rel="noopener">GreekDubDB</a>.
+    Τα σύνολα επεισοδίων είναι από γενικές πηγές και μπορεί να είναι κατά προσέγγιση.
+  </footer>
+</main>
+
+<script src="assets/app.js"></script>
+</body>
+</html>
