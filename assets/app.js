@@ -248,18 +248,29 @@
   function groupDetail(v) {
     const g = v.group;
     if (g.length === 1) return detail(g[0].s, true);
-    const cur = g[pick[v.id]] ? pick[v.id] : g.indexOf(bestOf(g));
+    // προεπιλογή: «Όλα» = η ένωση όλων των καναλιών· αλλιώς ένα συγκεκριμένο κανάλι
+    const cur = g[pick[v.id]] ? pick[v.id] : -1;
+    const xa = stats(v);
+    const optAll = `<button type="button" class="pick" data-v="${esc(v.id)}" data-i="-1" aria-pressed="${cur === -1}" title="Από όλα τα κανάλια μαζί">
+        <span class="logo"><b class="all-logo">ΟΛΑ</b></span>${pie(xa.f, xa.p, xa.t, 18, 5, xa.u)}<small>${xa.f + xa.p + xa.u}/${xa.t || "—"}</small></button>`;
+    if (cur === -1) return `<div class="picks"><span class="also-h">Κανάλι:</span>${optAll}${opts(g, v, cur)}</div>${detail(bestOf(g).s, true, v)}`;
     const sel = g[cur];
-    const opts = g.map((o, i) => {
+    return picked(g, v, cur, sel, optAll);
+  }
+  function opts(g, v, cur) {
+    return g.map((o, i) => {
       const x = stats(o.s), same = g.findIndex((y) => y.s.dub === o.s.dub) !== i;
       return `<button type="button" class="pick" data-v="${esc(v.id)}" data-i="${i}" aria-pressed="${i === cur}" title="${esc(o.ch.name)}${o.s.channel ? " (" + esc(o.s.channel) + ")" : ""}${same ? " · ίδια μεταγλώττιση" : ""}">
         <span class="logo"><img src="assets/logos/${o.ch.id}.png" alt="${esc(o.ch.name)}"></span>${pie(x.f, x.p, x.t, 18, 5, x.u)}<small>${x.f + x.p + x.u}/${x.t || "—"}</small></button>`;
     }).join("");
-    const m = [sel.s.aired ? `1η προβολή ${sel.s.airedApprox ? "~" : ""}${sel.s.aired}` : sel.s.dubyear ? `μεταγλ. ${sel.s.dubyear}` : "", sel.s.channel].filter(Boolean).join(" · ");
-    return `<div class="picks"><span class="also-h">Κανάλι:</span>${opts}</div>${m ? `<p class="meta pick-meta">${esc(sel.ch.name)} · ${esc(m)}</p>` : ""}${detail(sel.s, true)}`;
   }
-  function detail(s, inAll) {
-    const E = epsOf(s), t = totalOf(s), L = listOf(s);
+  function picked(g, v, cur, sel, optAll) {
+    const m = [sel.s.aired ? `1η προβολή ${sel.s.airedApprox ? "~" : ""}${sel.s.aired}` : sel.s.dubyear ? `μεταγλ. ${sel.s.dubyear}` : "", sel.s.channel].filter(Boolean).join(" · ");
+    return `<div class="picks"><span class="also-h">Κανάλι:</span>${optAll}${opts(g, v, cur)}</div>${m ? `<p class="meta pick-meta">${esc(sel.ch.name)} · ${esc(m)}</p>` : ""}${detail(sel.s, true)}`;
+  }
+  // union: η εικονική σειρά της καρτέλας «Όλα» — η κατάσταση κάθε επεισοδίου είναι η καλύτερη από όλα τα κανάλια
+  function detail(s, inAll, union) {
+    const E = epsOf(union || s), t = totalOf(union || s), L = listOf(s);
     const others = (BYWORK[s.work] || []).filter((o) => o.s !== s);
     const otherDubs = others.filter((o) => o.s.dub !== s.dub);
     const seenDub = new Set();
@@ -270,6 +281,8 @@
       .filter((o) => o.ch && !seenCh.has(o.ch.id) && seenCh.add(o.ch.id));
     const badges = (i) => badgeChs.length < 2 ? "" : badgeChs.map((o) => {
       const e = epsOf(o.s)[String(i)];
+      // στο συγκεκριμένο κανάλι φαίνεται πάντα και το δικό του λογότυπο (κόκκινο αν λείπει), ώστε να είναι σαφές σε ποιο αφορά η κατάσταση
+      if (!e && !union && o.s === s) return `<span class="ob m" title="${esc(o.ch.name)}: λείπει"><img src="assets/logos/${o.ch.id}.png" alt="${esc(o.ch.name)}"></span>`;
       return e ? `<span class="ob ${e.s}" title="${esc(o.ch.name)}: ${e.s === "f" ? "βρέθηκε" : "με ελλείψεις"}${e.n ? " — " + esc(e.n) : ""}"><img src="assets/logos/${o.ch.id}.png" alt="${esc(o.ch.name)}"></span>` : "";
     }).join("");
     let grid = "";
@@ -362,7 +375,7 @@
       return;
     }
     const pk = e.target.closest(".pick");
-    if (pk) { pick[pk.dataset.v] = +pk.dataset.i; renderList(); return; }
+    if (pk) { if (+pk.dataset.i < 0) delete pick[pk.dataset.v]; else pick[pk.dataset.v] = +pk.dataset.i; renderList(); return; }
     const ef = e.target.closest(".epf button");
     if (ef) {
       const d = ef.closest(".detail");

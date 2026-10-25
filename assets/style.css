@@ -232,6 +232,7 @@ select#sort {
 .epl.p .st b { background: var(--partial); color: #fff; }
 .ob { display: inline-grid; place-items: center; background: #14131c; border-radius: 4px; height: 18px; padding: 0 4px; border: 2px solid var(--found); }
 .ob.p { border-color: var(--partial); }
+.ob.m { border-color: var(--missing); opacity: .75; }
 .ob img { max-height: 10px; max-width: 34px; }
 .row .ttl { display: flex; align-items: center; gap: 12px; min-width: 0; }
 img.ava { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; flex: none; background: var(--line); }
