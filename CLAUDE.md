@@ -24,10 +24,12 @@
   (ANT1 1990, MEGA 1989, STAR/ΣΚΑΪ 1993, ALTER 1994)· τότε `airedApprox: true` και `dubyear` κρατά το αρχικό.
   Ο χρήστης θέλει ακριβή έτη **μόνο** αν τα γράφει η GreekDubDB — όχι εικασίες.
 - Λίστες επεισοδίων: μόνο από πηγές (Wikipedia, TheTVDB, TVmaze, ANN…), **ποτέ τίτλοι από μνήμη**· κενός τίτλος αν λείπει.
-  Μορφή εμφάνισης SxxExxx· anime χωρίς κύκλους απόλυτη αρίθμηση (`"s": null`).
+  Τίτλοι πάντα **στα αγγλικά** (επίσημη αγγλική μετάφραση TheTVDB όπου υπάρχει, αλλιώς μετάφραση από τον πρωτότυπο τίτλο). Μορφή εμφάνισης SxxExxx· anime χωρίς κύκλους απόλυτη αρίθμηση (`"s": null`).
 - Αποφάσεις του χρήστη για σύνολα: TMNT 1987 ANT1 χωρίς Red Sky (169) · Captain Planet MEGA 65 · Nintama ANT1 47 (1ο intro) ·
   Dr. Slump ANT1 έως 50 · Pokémon STAR 587 (πριν το 16:9) · Thomas STAR/ALTER κύκλοι 1–10 (262, κοινή μεταγλώττιση) ·
   Sesame Street ΕΡΤ 70s–80s, STAR 80s–90s (~2600, κατά προσέγγιση) · One Piece ALTER 106 · Oggy ALTER κύκλοι 1–2 (156 σκετς) ·
+  Peppa Pig όλα (447) σε όλα τα κανάλια · Animaniacs K-T.V. όλα (274) μέχρι αποδείξεως του αντιθέτου ·
+  Fairly OddParents: Disney κύκλοι 1–4 (92), Nickelodeon κύκλοι 5–10 (177, χωριστό `work` g293-s5) ·
   Batman: The Animated Series ANT1 65· τα 20 επόμενα χωριστή σειρά «Adventures of Batman & Robin, The» (`work` g123-br, ίδια καταχώριση GreekDubDB).
 - Αποφάσεις για μεταγλωττίσεις (έλεγχος GreekDubDB, 10/2026): Heathcliff MEGA (1989) χωριστά από STAR (1993) ·
   Les Nouvelles Aventures de Lucky Luke μόνο ALTER (η ΕΡΤ2 έχει δική της του 2017) · Delfy ΕΡΤ/ALTER διαφορετικές μεταγλωττίσεις.
