@@ -33,7 +33,7 @@
 - Αποφάσεις του χρήστη για σύνολα: TMNT 1987 ANT1 χωρίς Red Sky (169) · Captain Planet MEGA 65 · Nintama ANT1 47 (1ο intro) ·
   Dr. Slump ANT1 έως 50 · Pokémon STAR 587 (πριν το 16:9) · Thomas STAR/ALTER κύκλοι 1–10 (262, κοινή μεταγλώττιση) ·
   Sesame Street ΕΡΤ 70s–80s, STAR 80s–90s (~2600, κατά προσέγγιση) · One Piece ALTER 106 · Oggy ALTER κύκλοι 1–2 (156 σκετς) ·
-  Crayon Shin-chan STAR έως 525 (πριν το 16:9) · Peppa Pig όλα (447) σε όλα τα κανάλια · Animaniacs K-T.V. όλα (274) μέχρι αποδείξεως του αντιθέτου ·
+  Crayon Shin-chan STAR μόνο τα 52 της Vitello (3 σκετς το καθένα· 10/2026) · Peppa Pig όλα (447) σε όλα τα κανάλια · Animaniacs K-T.V. όλα (274) μέχρι αποδείξεως του αντιθέτου ·
   Fairly OddParents: Disney κύκλοι 1–4 (92), Nickelodeon κύκλοι 5–10 (177, χωριστό `work` g293-s5) ·
   Batman: The Animated Series ANT1 65· τα 20 επόμενα χωριστή σειρά «Adventures of Batman & Robin, The» (`work` g123-br, ίδια καταχώριση GreekDubDB) ·
   **Εξαίρεση:** Mighty Morphin Power Rangers χωρισμένο σε 3 σειρές, μία ανά κύκλο («(Season N)», `work` g706-s1/s2/s3, `dub` g706-s1@1994, g706-s2@1994, g706-s3@1996) σε ANT1/Fox Kids/Jetix· το Alien Rangers (10 επ.) ενσωματώθηκε στο τέλος του 3ου κύκλου ως Ε34–Ε43 (ANT1/Jetix 43, Fox Kids 33· 10/2026).
