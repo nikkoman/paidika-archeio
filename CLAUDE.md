@@ -36,7 +36,7 @@
   Crayon Shin-chan STAR έως 525 (πριν το 16:9) · Peppa Pig όλα (447) σε όλα τα κανάλια · Animaniacs K-T.V. όλα (274) μέχρι αποδείξεως του αντιθέτου ·
   Fairly OddParents: Disney κύκλοι 1–4 (92), Nickelodeon κύκλοι 5–10 (177, χωριστό `work` g293-s5) ·
   Batman: The Animated Series ANT1 65· τα 20 επόμενα χωριστή σειρά «Adventures of Batman & Robin, The» (`work` g123-br, ίδια καταχώριση GreekDubDB) ·
-  **Εξαίρεση:** Mighty Morphin Power Rangers χωρισμένο σε 3 σειρές, μία ανά κύκλο («(Season N)», `work` g706-s1/s2/s3, `dub` g706-s1@1994, g706-s2@1994, g706-s3@1996) σε ANT1/Fox Kids/Jetix· το Alien Rangers μένει χωριστό (g707).
+  **Εξαίρεση:** Mighty Morphin Power Rangers χωρισμένο σε 3 σειρές, μία ανά κύκλο («(Season N)», `work` g706-s1/s2/s3, `dub` g706-s1@1994, g706-s2@1994, g706-s3@1996) σε ANT1/Fox Kids/Jetix· το Alien Rangers (10 επ.) ενσωματώθηκε στο τέλος του 3ου κύκλου ως Ε34–Ε43 (ANT1/Jetix 43, Fox Kids 33· 10/2026).
 - Αποφάσεις για μεταγλωττίσεις (έλεγχος GreekDubDB, 10/2026): Heathcliff MEGA (1989) χωριστά από STAR (1993) ·
   New Adventures of Lucky Luke (Les Nouvelles Aventures…) μόνο ALTER (η ΕΡΤ2 έχει δική της του 2017) · Delfy ΕΡΤ/ALTER διαφορετικές μεταγλωττίσεις.
 - Δεν μπαίνει τίποτα με **1 μόνο επεισόδιο** (ειδικά, making-of κ.λπ.· π.χ. Power Rangers: Secrets Revealed αφαιρέθηκε 10/2026). Προσοχή: το TVmaze έχει συχνά ελλιπείς σελίδες (1–6 επεισόδια)· σύγκρινε πάντα με TheTVDB/Wikipedia πριν δεχτείς λίστα του.
