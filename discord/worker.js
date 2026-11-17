@@ -2,7 +2,9 @@
 //
 // Μυστικά (Settings → Variables and Secrets του Worker):
 //   DISCORD_PUBLIC_KEY  δημόσιο κλειδί της εφαρμογής (Discord Developer Portal → General Information)
-//   GITHUB_TOKEN        fine-grained token με δικαίωμα Contents: Read and write στο repository
+//   GITHUB_APP_ID       ID της GitHub App «paidika-bot» (προτιμάται: δεν λήγει ποτέ)
+//   GITHUB_APP_KEY      το private key (.pem) της App, ολόκληρο, μαζί με τις γραμμές BEGIN/END
+//   GITHUB_TOKEN        (εφεδρικό, παλιός τρόπος) fine-grained token με Contents: Read and write — λήγει
 //   INDEX_KEY           το ίδιο κλειδί με το GitHub secret ARCHIVE_INDEX_KEY
 //   ANTHROPIC_API_KEY   κλειδί API του Claude (console.anthropic.com) για την εντολή /πες
 //   ALLOWED_ROLE_ID     (προαιρετικό) μόνο μέλη με αυτόν τον ρόλο αλλάζουν δεδομένα
@@ -84,15 +86,76 @@ function parseRange(spec, total) {
   return spec;
 }
 
+// ---------- Πρόσβαση στο GitHub ----------
+// Με GitHub App (GITHUB_APP_ID + GITHUB_APP_KEY) ο Worker φτιάχνει μόνος του ένα token που ισχύει 1 ώρα
+// και το ανανεώνει αυτόματα — τίποτα δεν λήγει. Αλλιώς χρησιμοποιεί το GITHUB_TOKEN (λήγει).
+const GH_HEADERS = { Accept: "application/vnd.github+json", "User-Agent": "paidika-archeio-bot" };
+const ghToken = { value: "", exp: 0 };
+const b64uBytes = (u8) => btoa(String.fromCharCode(...u8)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+
+// Μήκος DER
+function derLen(n) {
+  if (n < 128) return [n];
+  const out = [];
+  while (n > 0) { out.unshift(n & 255); n >>= 8; }
+  return [0x80 | out.length, ...out];
+}
+
+// Το GitHub δίνει κλειδί PKCS#1 («BEGIN RSA PRIVATE KEY»)· το WebCrypto θέλει PKCS#8 — το «τυλίγουμε»
+async function appKey(pem) {
+  pem = String(pem).replace(/\\n/g, "\n");
+  const pkcs1 = /BEGIN RSA PRIVATE KEY/.test(pem);
+  let der = b64(pem.replace(/-----[^-]+-----/g, "").replace(/\s+/g, ""));
+  if (pkcs1) {
+    const algo = [0x30, 0x0d, 0x06, 0x09, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x01, 0x05, 0x00];
+    const body = [0x02, 0x01, 0x00, ...algo, 0x04, ...derLen(der.length)];
+    const total = body.length + der.length;
+    const out = new Uint8Array(1 + derLen(total).length + total);
+    out.set([0x30, ...derLen(total), ...body]);
+    out.set(der, out.length - der.length);
+    der = out;
+  }
+  return crypto.subtle.importKey("pkcs8", der, { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["sign"]);
+}
+
+async function appJwt(env) {
+  const now = Math.floor(Date.now() / 1000);
+  const enc = (o) => b64uBytes(new TextEncoder().encode(JSON.stringify(o)));
+  const data = enc({ alg: "RS256", typ: "JWT" }) + "." + enc({ iat: now - 60, exp: now + 540, iss: String(env.GITHUB_APP_ID).trim() });
+  const sig = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", await appKey(env.GITHUB_APP_KEY), new TextEncoder().encode(data));
+  return data + "." + b64uBytes(new Uint8Array(sig));
+}
+
+async function githubToken(env) {
+  if (!(env.GITHUB_APP_ID && env.GITHUB_APP_KEY)) {
+    if (env.GITHUB_TOKEN) return env.GITHUB_TOKEN;
+    throw new Error("λείπει η πρόσβαση στο GitHub (GITHUB_APP_ID/GITHUB_APP_KEY)");
+  }
+  if (ghToken.value && Date.now() < ghToken.exp - 5 * 60 * 1000) return ghToken.value;
+  const jwt = await appJwt(env);
+  const auth = { ...GH_HEADERS, Authorization: `Bearer ${jwt}` };
+  const inst = await fetch(`https://api.github.com/repos/${REPO}/installation`, { headers: auth });
+  if (!inst.ok) throw new Error(`GitHub App: η εφαρμογή δεν είναι εγκατεστημένη στο repo (${inst.status})`);
+  const { id } = await inst.json();
+  const r = await fetch(`https://api.github.com/app/installations/${id}/access_tokens`, { method: "POST", headers: auth });
+  if (!r.ok) throw new Error(`GitHub App: αποτυχία token (${r.status})`);
+  const t = await r.json();
+  ghToken.value = t.token;
+  ghToken.exp = Date.parse(t.expires_at) || Date.now() + 50 * 60 * 1000;
+  return ghToken.value;
+}
+
 async function dispatch(env, payload) {
-  const r = await fetch(`https://api.github.com/repos/${REPO}/dispatches`, {
+  const send = (token) => fetch(`https://api.github.com/repos/${REPO}/dispatches`, {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${env.GITHUB_TOKEN}`, Accept: "application/vnd.github+json",
-      "User-Agent": "paidika-archeio-bot", "Content-Type": "application/json",
-    },
+    headers: { ...GH_HEADERS, Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     body: JSON.stringify({ event_type: "archive-update", client_payload: payload }),
   });
+  let r;
+  try { r = await send(await githubToken(env)); }
+  catch (e) { if (!env.GITHUB_TOKEN) throw e; }
+  // Αν η App αποτύχει για οποιονδήποτε λόγο, δοκίμασε το εφεδρικό GITHUB_TOKEN (αν υπάρχει)
+  if ((!r || !r.ok) && env.GITHUB_TOKEN && env.GITHUB_APP_ID) { ghToken.value = ""; r = await send(env.GITHUB_TOKEN); }
   if (!r.ok) throw new Error(`GitHub ${r.status}`);
 }
 
@@ -554,7 +617,17 @@ export default {
       if (new URL(req.url).pathname === "/check") {
         const out = [];
         out.push("DISCORD_PUBLIC_KEY: " + (env.DISCORD_PUBLIC_KEY ? "ok (" + env.DISCORD_PUBLIC_KEY.length + " χαρακτήρες)" : "ΛΕΙΠΕΙ"));
-        out.push("GITHUB_TOKEN: " + (env.GITHUB_TOKEN ? "ok" : "ΛΕΙΠΕΙ"));
+        if (env.GITHUB_APP_ID && env.GITHUB_APP_KEY) {
+          try {
+            ghToken.value = "";
+            const tok = await githubToken(env);
+            const r = await fetch(`https://api.github.com/repos/${REPO}`, { headers: { ...GH_HEADERS, Authorization: `Bearer ${tok}` } });
+            out.push("GitHub App: ok (δεν λήγει)" + (r.ok ? "" : " — όμως HTTP " + r.status));
+          } catch (e) { out.push("GitHub App: ΣΦΑΛΜΑ — " + e.message); }
+        } else {
+          out.push("GitHub App: δεν έχει ρυθμιστεί (GITHUB_APP_ID / GITHUB_APP_KEY)");
+        }
+        out.push("GITHUB_TOKEN (εφεδρικό): " + (env.GITHUB_TOKEN ? "ok" : "—"));
         out.push("ANTHROPIC_API_KEY: " + (env.ANTHROPIC_API_KEY ? "ok" : "ΛΕΙΠΕΙ (χρειάζεται για το /πες)"));
         out.push("INDEX_KEY: " + (env.INDEX_KEY ? "ok (" + env.INDEX_KEY.trim().length + " χαρακτήρες)" : "ΛΕΙΠΕΙ"));
         try {

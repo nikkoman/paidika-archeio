@@ -78,7 +78,7 @@
   Τα μη επιτρεπτά αφαιρούνται από το αίτημα και τα υπόλοιπα περνούν, με ⚠️ που γράφει ποιο μέλος (tag από το Discord id `u` ανά επεισόδιο).
 - Ροή: Worker → GitHub `repository_dispatch` → `.github/workflows/archive-update.yml` → commit → Pages.
   Το workflow **δεν** έχει concurrency group (ακύρωνε αιτήματα σε αναμονή)· σε σύγκρουση ξαναεφαρμόζει πάνω στο τελευταίο main.
-- Secrets Worker: `DISCORD_PUBLIC_KEY`, `GITHUB_TOKEN`, `INDEX_KEY`, `ANTHROPIC_API_KEY` (προαιρ. `ALLOWED_ROLE_ID`).
+- Secrets Worker: `DISCORD_PUBLIC_KEY`, `GITHUB_APP_ID` + `GITHUB_APP_KEY` (GitHub App «paidika-bot» εγκατεστημένη στο repo, Contents: Read and write· ο Worker φτιάχνει μόνος του token 1 ώρας, **δεν λήγει τίποτα**· 11/2026), `INDEX_KEY`, `ANTHROPIC_API_KEY` (προαιρ. `ALLOWED_ROLE_ID`, εφεδρικό `GITHUB_TOKEN` = παλιό fine-grained PAT που λήγει). Έλεγχος στο `/check` («GitHub App: ok»).
   Secrets GitHub: `ARCHIVE_PASSWORD`, `ARCHIVE_INDEX_KEY`, `DISCORD_APP_ID`, `DISCORD_BOT_TOKEN`, `DISCORD_GUILD_ID`.
 
 ## Νέα συνεδρία — πρώτα βήματα
